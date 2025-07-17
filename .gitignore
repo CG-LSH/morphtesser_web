@@ -1,0 +1,66 @@
+# Java
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven
+/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+
+# Spring Boot
+spring.log
+
+# Node
+node_modules/
+
+# React
+/build/
+/dist/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Python (for backend python_service)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+.venv
+venv/
+ENV/
+
+# Database
+*.mv.db
+*.trace.db
+*.h2.db
+*.sqlite
+*.db
+
+# Uploads and generated files
+uploads/
+frontend/uploads/
+backend/uploads/
+
+# Misc
+.env
+.env.* 
