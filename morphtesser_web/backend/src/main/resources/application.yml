@@ -1,0 +1,5 @@
+python:
+  service:
+    url: http://localhost:5000
+  script-path: scripts/swc_to_obj.py
+  executable: python 
