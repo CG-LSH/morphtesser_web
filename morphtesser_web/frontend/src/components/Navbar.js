@@ -7,7 +7,7 @@ import { useTheme } from '@mui/material/styles';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+
 import CollectionsIcon from '@mui/icons-material/Collections';
 import LogoutIcon from '@mui/icons-material/Logout';
 import LoginIcon from '@mui/icons-material/Login';
@@ -121,8 +121,8 @@ const Navbar = () => {
               </MenuItem>
               {currentUser && (
                 <>
-                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/upload'); }}>
-                    <CloudUploadIcon sx={{ mr: 1 }} /> Upload Model
+                  <MenuItem onClick={() => { handleCloseNavMenu(); navigate('/online-builder'); }}>
+                    <BuildIcon sx={{ mr: 1 }} /> Online Modeling
                   </MenuItem>
                 </>
               )}
@@ -142,14 +142,6 @@ const Navbar = () => {
           </Button>
           {currentUser && (
             <>
-              <Button
-                component={Link}
-                to="/upload"
-                sx={{ color: 'white', mx: 1 }}
-                startIcon={<CloudUploadIcon />}
-              >
-                Upload Model
-              </Button>
               <Button
                 component={Link}
                 to="/online-builder"

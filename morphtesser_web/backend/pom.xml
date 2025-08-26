@@ -100,6 +100,20 @@
             <artifactId>mysql-connector-java</artifactId>
             <version>8.0.33</version>
         </dependency>
+
+        <!-- SMB 客户端（smbj）-->
+        <dependency>
+            <groupId>com.hierynomus</groupId>
+            <artifactId>smbj</artifactId>
+            <version>0.10.0</version>
+        </dependency>
+
+        <!-- JCIFS-NG 作为 SMB 读取简化实现 -->
+        <dependency>
+            <groupId>org.codelibs</groupId>
+            <artifactId>jcifs</artifactId>
+            <version>2.1.24</version>
+        </dependency>
     </dependencies>
 
     <build>

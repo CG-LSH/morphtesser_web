@@ -1,0 +1,184 @@
+FROM ubuntu:23.04
+MAINTAINER Tristan CAREL <tristan.carel@epfl.ch>
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+ENV SHELL=/bin/bash
+ENV TZ=Europe/Geneva
+
+# 更新软件源到旧版本仓库
+RUN sed -i 's/archive.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list \
+ && sed -i 's/security.ubuntu.com/old-releases.ubuntu.com/g' /etc/apt/sources.list
+
+RUN apt-get --yes -qq update \
+ && apt-get --yes -qq upgrade \
+ && apt-get --yes -qq install \
+                      bzip2 \
+                      cmake \
+                      cpio \
+                      curl \
+                      g++ \
+                      gcc \
+                      gfortran \
+                      git \
+                      graphviz \
+                      htop \
+                      libeigen3-dev \
+                      libboost-dev \
+                      libgl1 \
+                      libglu1 \
+                      libmetis-dev \
+                      librdmacm-dev \
+                      libxcursor1 \
+                      libxft2 \
+                      libxinerama1 \
+                      pandoc \
+                      pkg-config \
+                      vim       \
+                      wget \
+                      zlib1g-dev \
+ && apt-get --yes -qq clean \
+ && rm -rf /var/lib/apt/lists/*
+
+ENV GOSU_VERSION 1.17
+RUN dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
+ && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch" \
+ && chmod +x /usr/local/bin/gosu \
+# verify that the binary works
+ && gosu nobody true
+
+ARG MINICONDA_VERSION=3-py310_24.4.0-0
+RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh \
+ && dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')" \
+ && minicondaArch="$(case $dpkgArch in amd64) echo x86_64 ;; arm64) echo aarch64 ;; *) echo Unexpected arch: $dpkgArch; false ;; esac)" \
+ && wget --quiet https://repo.continuum.io/miniconda/Miniconda${MINICONDA_VERSION}-Linux-${minicondaArch}.sh -O ~/miniconda.sh \
+ && /bin/bash ~/miniconda.sh -b -p /opt/conda \
+ && rm ~/miniconda.sh \
+ && /opt/conda/bin/conda install -c conda-forge python=3.10 \
+ && /opt/conda/bin/conda install -c conda-forge \
+   build \
+   "h5py[version='>=2.9',build=mpi*]" \
+   cython \
+   jupyter \
+   jupyterlab \
+   nose \
+   petsc \
+   petsc4py \
+   python-libsbml \
+   scipy \
+ && /opt/conda/bin/pip install matplotlib \
+ && /opt/conda/bin/conda install --solver=classic \
+   conda-forge::conda-libmamba-solver \
+   conda-forge::libarchive \
+   conda-forge::libmamba \
+   conda-forge::libmambapy
+ENV PATH "/opt/conda/bin:$PATH"
+ENV CMAKE_PREFIX_PATH=/opt/conda
+
+ARG GMSH_VERSION=4.12.2
+# 尝试从网络下载GMSH，如果失败则使用系统包管理器
+RUN cd /tmp \
+ && (wget --timeout=60 --tries=3 --retry-connrefused --no-check-certificate https://gmsh.info/src/gmsh-${GMSH_VERSION}-source.tgz || \
+     wget --timeout=60 --tries=3 --retry-connrefused --no-check-certificate https://github.com/Gmsh/gmsh/releases/download/v${GMSH_VERSION}/gmsh-${GMSH_VERSION}-source.tgz || \
+     wget --timeout=60 --tries=3 --retry-connrefused --no-check-certificate https://gitlab.onelab.info/gmsh/gmsh/-/archive/v${GMSH_VERSION}/gmsh-v${GMSH_VERSION}.tar.gz -O gmsh-${GMSH_VERSION}-source.tgz || \
+     (echo "Network download failed, trying system package manager" && apt-get update && apt-get install -y gmsh && ln -s /usr/bin/gmsh /opt/gmsh-${GMSH_VERSION}/bin/gmsh && exit 0)) \
+ && (if [ -f gmsh-${GMSH_VERSION}-source.tgz ]; then \
+       tar zxf gmsh-${GMSH_VERSION}-source.tgz \
+    && cd gmsh-${GMSH_VERSION}-source \
+    && cmake \
+          -DCMAKE_INSTALL_PREFIX=/opt/gmsh-${GMSH_VERSION} \
+          -DENABLE_BUILD_SHARED:BOOL=True \
+          -DENABLE_BUILD_DYNAMIC:BOOL=True \
+          -DENABLE_FLTK:BOOL=FALSE . \
+    && make -j 4 \
+    && make install \
+    && cd .. \
+    && rm -rf gmsh-${GMSH_VERSION}-source gmsh-${GMSH_VERSION}-source.tgz; \
+    fi)
+ENV PATH "/opt/gmsh-${GMSH_VERSION}/bin:$PATH"
+ENV CMAKE_PREFIX_PATH="/opt/gmsh-${GMSH_VERSION}:${CMAKE_PREFIX_PATH}"
+ENV GMSH_DIR="/opt/gmsh-${GMSH_VERSION}"
+ENV GMSH_INCLUDE_DIRS="/opt/gmsh-${GMSH_VERSION}/include"
+ENV GMSH_LIBRARIES="/opt/gmsh-${GMSH_VERSION}/lib/libgmsh.so"
+
+ARG BUILD_OMEGA_H=true
+ARG OMEGA_H_VERSION=v9.34.13
+RUN if [ "x$BUILD_OMEGA_H" = xtrue ] ; then ( \
+    git clone \
+      --single-branch -b "$OMEGA_H_VERSION" \
+      https://github.com/sandialabs/omega_h.git \
+      /var/src/omega_h \
+ && mkdir /var/src/omega_h/_build \
+ && cd /var/src/omega_h/_build \
+ && cmake \
+       -DOmega_h_USE_Gmsh:BOOL=TRUE \
+       -DOmega_h_USE_MPI:BOOL=TRUE \
+       -DGmsh_DIR=/opt/gmsh-4.12.2/lib/cmake/gmsh \
+       -DGMSH_INCLUDE_DIRS=/opt/gmsh-4.12.2/include \
+       -DGMSH_LIBRARIES=/opt/gmsh-4.12.2/lib/libgmsh.so \
+       -DCMAKE_PREFIX_PATH=/opt/gmsh-4.12.2 \
+       .. \
+ && make -j 4 install \
+ && ldconfig \
+ && rm -rf /var/src/omega_h \
+    ) fi
+
+ADD overlap-arm64.patch /var/src/
+ARG STEPS_VERSION=5.0.2
+ARG STEPS_UT=false
+ARG STEPS_UT_KEEP_GOING=true
+ENV CTEST_OUTPUT_ON_FAILURE=1
+ARG STEPS_REPOSITORY=STEPS
+ARG STEPS_ACCESS_TOKEN=
+ARG STEPS_NATIVE_ARCH=False
+RUN chmod +x /root \
+ && git clone --recursive \
+    https://${STEPS_ACCESS_TOKEN}github.com/CNS-OIST/${STEPS_REPOSITORY}.git /var/src/STEPS \
+ && cd /var/src/STEPS \
+ && git checkout "$STEPS_VERSION" \
+ && git submodule update --init --recursive \
+ && patch -p1 < /var/src/overlap-arm64.patch \
+ && mkdir build \
+ && cd build \
+ && python -c "import os,sysconfig; os.makedirs(sysconfig.get_path('platlib', f'{os.name}_user'), exist_ok=True)" \
+ && cmake \
+      -DTARGET_NATIVE_ARCH:BOOL="$STEPS_NATIVE_ARCH" \
+      -DUSE_BUNDLE_SUNDIALS:BOOL=TRUE \
+      -DUSE_BUNDLE_OMEGA_H:BOOL=FALSE \
+      -DUSE_MPI:BOOL=ON \
+      -DSTEPS_USE_DIST_MESH:BOOL=TRUE \
+      -DSTEPS_INSTALL_PYTHON_DEPS:BOOL=FALSE \
+      .. \
+ && make -j 4 all \
+ && ([ "$STEPS_UT" = false ] || \
+      if [ "x$STEPS_UT_KEEP_GOING" = xtrue ] ; then \
+        ( make test || true ) ; else \
+        make test ; \
+      fi \
+    ) \
+ && make install \
+ && rm -rf /var/src/STEPS
+
+RUN git clone https://github.com/CNS-OIST/STEPS_Example.git /var/src/STEPS_Example \
+ && mv /var/src/STEPS_Example/user_manual/source /var/src/user_manual \
+ && rm -rf /var/src/STEPS_Example
+
+ARG EXAMPLE_NOTEBOOKS_TO_REBUILD="diffusion_boundary diffusion getting_started ip3 memb_pot sbml_importer surface_diffusion_boundary surface_diffusion well_mixed"
+# https://nbconvert.readthedocs.io/en/latest/usage.html#convert-notebook
+RUN cd /var/src/user_manual \
+ && jupyter nbconvert \
+      --to notebook \
+      --execute \
+      --inplace \
+      --ExecutePreprocessor.timeout=3600 \
+      $EXAMPLE_NOTEBOOKS_TO_REBUILD
+
+ADD entrypoint /usr/bin/
+
+CMD [ \
+    "jupyter", "lab", \
+    "--no-browser", "--allow-root", \
+    "--ip=0.0.0.0", \
+    "--notebook-dir=/opt/src/notebooks" \
+] 

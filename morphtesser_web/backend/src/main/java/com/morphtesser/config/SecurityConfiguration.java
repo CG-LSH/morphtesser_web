@@ -55,12 +55,24 @@ public class SecurityConfiguration {
             .csrf(csrf -> csrf.disable())
             .authenticationProvider(authenticationProvider())
             .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll() // 允许所有请求匿名访问
+                .requestMatchers("/api/embed/**").permitAll() // 允许嵌入式资源代理 - 优先级最高
+                .requestMatchers("/embed/**").permitAll() // 允许前端嵌入路由
+                .requestMatchers("/").permitAll() // 允许访问根路径
+                .requestMatchers("/index.html").permitAll() // 允许访问主页面
+                .requestMatchers("/static/**").permitAll() // 允许访问静态资源
+                .requestMatchers("/api/models/**").permitAll() // 允许所有人访问建模相关接口
+                .requestMatchers("/api/datasets/**").permitAll() // 允许所有人访问数据集相关接口
+                .requestMatchers("/uploads/**").permitAll() // 允许所有人访问静态资源
+                .anyRequest().authenticated() // 其他接口仍需认证
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            );
+            )
+            .httpBasic(basic -> basic.disable()) // 禁用HTTP Basic认证
+            .formLogin(form -> form.disable()) // 禁用表单登录
+            .logout(logout -> logout.disable()); // 禁用登出
 
+        // 添加JWT过滤器
         http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
         
         return http.build();
@@ -69,7 +81,8 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        // 放宽跨域来源以支持内网IP与外站嵌入
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

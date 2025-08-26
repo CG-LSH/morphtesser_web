@@ -81,6 +81,13 @@ const createModel = ({ name, type, swcFile }) => {
   });
 };
 
+const createModelFromOnlineBuilder = (formData, onUploadProgress) => {
+  return axios.post('/api/models/create', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress,
+  });
+};
+
 const modelService = {
   uploadModel,
   getModelById,
@@ -88,7 +95,8 @@ const modelService = {
   deleteModel,
   getModelFileUrl,
   downloadModelFile,
-  createModel
+  createModel,
+  createModelFromOnlineBuilder
 };
 
 export default modelService; 

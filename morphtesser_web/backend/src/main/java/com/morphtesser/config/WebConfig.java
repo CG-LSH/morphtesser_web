@@ -2,6 +2,7 @@ package com.morphtesser.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -20,9 +21,15 @@ public class WebConfig implements WebMvcConfigurer {
 
          // SWC 文件映射
         registry.addResourceHandler("/uploads/swc/**")
-                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/LSH/");
-        // OBJ 文件映射（如果需要）
+                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/");
+        // OBJ 文件映射
         registry.addResourceHandler("/uploads/obj/**")
-                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/LSH/");
+                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/");
+    }
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        // 为前端路由添加视图控制器，确保React Router能处理路由
+        registry.addViewController("/embed/**").setViewName("forward:/index.html");
     }
 } 

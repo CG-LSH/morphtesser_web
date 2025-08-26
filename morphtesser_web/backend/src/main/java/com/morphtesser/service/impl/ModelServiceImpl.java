@@ -40,6 +40,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
 
 @Service
 public class ModelServiceImpl implements ModelService {
@@ -217,15 +218,17 @@ public class ModelServiceImpl implements ModelService {
     @Override
     public ResponseEntity<?> createModelFromOnlineBuilder(String name, String type, String token, MultipartFile swcFile) {
         try {
-            // 验证令牌并获取用户名
+            // 验证令牌并获取用户名（允许匿名）
             String username = getUsernameFromToken(token);
-            if (username == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("无效的令牌");
+            User user;
+            if (username != null) {
+                user = getUserFromUsername(username);
+            } else {
+                user = userRepository.findByUsername("guest")
+                        .orElseThrow(() -> new RuntimeException("Guest user not found"));
             }
-            // 获取用户
-            User user = getUserFromUsername(username);
-            // 创建用户目录
-            String userDir = BASE_DIR + username + "/";
+            // 创建用户目录（匿名用户用guest目录）
+            String userDir = BASE_DIR + user.getUsername() + "/";
             Files.createDirectories(Paths.get(userDir));
             // 保存SWC文件
             String swcFileName = UUID.randomUUID().toString() + ".swc";
@@ -233,7 +236,7 @@ public class ModelServiceImpl implements ModelService {
             swcFile.transferTo(new File(swcFilePath));
             // 调用FastAPI服务，获得OBJ
             RestTemplate restTemplate = new RestTemplate();
-            String url = "http://localhost:8000/swc2obj/";
+            String url = "http://localhost:8000/swc2obj/"; 
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", new FileSystemResource(swcFilePath));
             // 关键：根据 type 传递 result_type
@@ -247,35 +250,80 @@ public class ModelServiceImpl implements ModelService {
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
             ResponseEntity<byte[]> response = restTemplate.exchange(
                 url, HttpMethod.POST, requestEntity, byte[].class);
-            String objFileName;
-            if ("refine".equals(type)) {
-                objFileName = swcFileName.replace(".swc", "_refined.obj");
-            } else {
-                objFileName = swcFileName.replace(".swc", ".obj");
-            }
+            String objFileName = "refine".equals(type)
+                    ? swcFileName.replace(".swc", "_refined.obj")
+                    : swcFileName.replace(".swc", ".obj");
             String objFilePath = Paths.get(userDir, objFileName).toString();
-            if (response.getStatusCode() == HttpStatus.OK) {
-                Files.write(Paths.get(objFilePath), response.getBody());
-            } else {
-                throw new RuntimeException("SWC转OBJ失败: " + response.getStatusCode());
+
+            // 判定是否真正得到了 OBJ：避免将 JSON 错误写入 OBJ 导致 0 字节或极小文件
+            String contentType = response.getHeaders().getContentType() != null
+                    ? response.getHeaders().getContentType().toString()
+                    : "";
+            byte[] bodyBytes = response.getBody();
+            boolean isJson = contentType.contains("application/json");
+            boolean looksTooSmall = bodyBytes == null || bodyBytes.length < 200; // 小文件大概率不是有效OBJ
+
+            boolean wroteObj = false;
+            if (response.getStatusCode() == HttpStatus.OK && !isJson && !looksTooSmall) {
+                Files.write(Paths.get(objFilePath), bodyBytes);
+                wroteObj = true;
+            }
+
+            // refined 失败则回退 raw
+            if (!wroteObj && "refine".equals(type)) {
+                MultiValueMap<String, Object> body2 = new LinkedMultiValueMap<>();
+                body2.add("file", new FileSystemResource(swcFilePath));
+                body2.add("result_type", "raw");
+                HttpEntity<MultiValueMap<String, Object>> req2 = new HttpEntity<>(body2, headers);
+                ResponseEntity<byte[]> resp2 = restTemplate.exchange(url, HttpMethod.POST, req2, byte[].class);
+
+                String ct2 = resp2.getHeaders().getContentType() != null ? resp2.getHeaders().getContentType().toString() : "";
+                byte[] b2 = resp2.getBody();
+                boolean json2 = ct2.contains("application/json");
+                boolean small2 = b2 == null || b2.length < 200;
+                // 覆盖为 raw 命名
+                objFileName = swcFileName.replace(".swc", ".obj");
+                objFilePath = Paths.get(userDir, objFileName).toString();
+                if (resp2.getStatusCode() == HttpStatus.OK && !json2 && !small2) {
+                    Files.write(Paths.get(objFilePath), b2);
+                    wroteObj = true;
+                }
+            }
+
+            if (!wroteObj) {
+                throw new RuntimeException("Out of memory: OBJ file was not generated. Modeling failed.");
+            }
+            // 关键：数据库字段带上用户名子目录
+            String swcHttpPath = "/uploads/swc/" + user.getUsername() + "/" + swcFileName;
+            String objHttpPath = "/uploads/obj/" + user.getUsername() + "/" + objFileName;
+            // 获取OBJ文件大小
+            long objSize = 0L;
+            File objFile = new File(objFilePath);
+            if (objFile.exists()) {
+                objSize = objFile.length();
             }
             // 创建模型记录
             NeuronModel model = new NeuronModel();
             model.setName(name);
-            model.setUser(user);
+            model.setUser(user); // 匿名用户归属于guest
             model.setCreatedAt(new Date());
-            model.setFilePath(swcFilePath.replace(BASE_DIR, ""));
-            // 关键：objFilePath 改为 HTTP 路径
-            String objHttpPath = "/uploads/obj/" + objFileName;
+            model.setFilePath(swcHttpPath);
             model.setObjFilePath(objHttpPath);
-            model.setBrainRegion("未指定"); // 补充，避免为null
-            model.setDescription("未填写"); // 补充，避免为null
-            model.setFileType("swc"); // 补充，避免为null
-            model.setSpecies("未指定"); // 补充，避免为null
-            // 其余元数据可补充
+            model.setBrainRegion("未指定");
+            model.setDescription("未填写");
+            model.setFileType("swc");
+            model.setSpecies("未指定");
             NeuronModel savedModel = modelRepository.save(model);
-            logger.info("在线建模成功: id={}, name={}, user={}", savedModel.getId(), name, username);
-            return ResponseEntity.ok(savedModel);
+            logger.info("在线建模成功: id={}, name={}, user={}, swcHttpPath={}, objHttpPath={}", savedModel.getId(), name, user.getUsername(), swcHttpPath, objHttpPath);
+            // 返回带objSize的结果
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", savedModel.getId());
+            result.put("name", savedModel.getName());
+            result.put("swcUrl", swcHttpPath);
+            result.put("objUrl", objHttpPath);
+            result.put("objSize", objSize);
+            result.put("createdAt", savedModel.getCreatedAt());
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             logger.error("在线建模失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("创建失败: " + e.getMessage());
@@ -283,14 +331,20 @@ public class ModelServiceImpl implements ModelService {
     }
     
     private String getUsernameFromToken(String token) {
-        if (token != null && token.startsWith("Bearer ")) {
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
+        if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
-        
-        if (jwtUtils.validateJwtToken(token)) {
-            return jwtUtils.getUserNameFromJwtToken(token);
+        try {
+            if (jwtUtils.validateJwtToken(token)) {
+                return jwtUtils.getUserNameFromJwtToken(token);
+            }
+        } catch (Exception e) {
+            // token无效或过期，直接返回null，允许匿名
+            return null;
         }
-        
         return null;
     }
 

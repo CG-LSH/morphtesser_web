@@ -1,3 +1,10 @@
+smb:
+  host: 10.6.51.163
+  domain: CVCD2
+  username: lsh@cvcd.xyz
+  password: "6^6zxmC$AUa5"
+  share: shared
+  root: morphtesser_exp/neuromorpho_08
 python:
   service:
     url: http://localhost:5000

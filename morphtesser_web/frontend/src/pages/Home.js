@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { Box, Container, Typography, Button, Grid, Card, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, TextField, FormControlLabel, RadioGroup, Radio } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import NeuronBackground from '../assets/images/neuron-bg';
-import VisualizationIcon from '../assets/icons/visualization';
-import AnalysisIcon from '../assets/icons/analysis';
-import LibraryIcon from '../assets/icons/library';
-import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+
+
+
 import BuildIcon from '@mui/icons-material/Build';
 import StorageIcon from '@mui/icons-material/Storage';
 import axios from 'axios';
@@ -117,36 +116,18 @@ const Home = () => {
           >
             Efficiently model and analyze neuron morphology, explore the mysteries of the brain
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 6 }}>
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              size="large"
-              onClick={() => navigate('/upload')}
-              sx={{
-                backgroundColor: 'rgba(25, 118, 210, 0.25)',
-                border: '2px solid rgba(255, 255, 255, 0.4)',
-                color: 'white',
-                zIndex: 2,
-                '&:hover': {
-                  backgroundColor: 'rgba(25, 118, 210, 0.35)',
-                  border: '2px solid rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 0 10px rgba(255, 255, 255, 0.2)'
-                }
-              }}
-            >
-              Data Analysis
-            </Button>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mb: 6 }}>
             <Button
               variant="outlined"
               color="primary"
               size="large"
-              onClick={() => setOpenDialog(true)}
+              onClick={() => navigate('/online-builder')}
               sx={{
                 backgroundColor: 'rgba(156, 39, 176, 0.25)',
                 border: '2px solid rgba(255, 255, 255, 0.4)',
                 color: 'white',
                 zIndex: 2,
+                minWidth: '200px',
                 '&:hover': {
                   backgroundColor: 'rgba(156, 39, 176, 0.35)',
                   border: '2px solid rgba(255, 255, 255, 0.8)',
@@ -160,12 +141,13 @@ const Home = () => {
               variant="outlined" 
               color="primary" 
               size="large"
-              onClick={() => navigate('/models')}
+              onClick={() => navigate('/public-database')}
               sx={{
                 backgroundColor: 'rgba(0, 200, 83, 0.25)',
                 border: '2px solid rgba(255, 255, 255, 0.4)',
                 color: 'white',
                 zIndex: 2,
+                minWidth: '200px',
                 '&:hover': {
                   backgroundColor: 'rgba(0, 200, 83, 0.35)',
                   border: '2px solid rgba(255, 255, 255, 0.8)',
@@ -173,12 +155,12 @@ const Home = () => {
                 }
               }}
             >
-              Public Models
+              Public Database
             </Button>
           </Box>
         </Box>
 
-        <Grid container spacing={4}>
+        <Grid container spacing={4} justifyContent="center">
           <Box
             sx={{
               position: 'absolute',
@@ -193,29 +175,7 @@ const Home = () => {
           >
             <NeuronAnimation />
           </Box>
-          <Grid item xs={12} md={4}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <CardContent sx={{ flexGrow: 1 }}>
-                <CloudUploadIcon sx={{ fontSize: 48, mb: 2 }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Data Analysis
-                </Typography>
-                <Typography>
-                  Upload SWC or OBJ format neuron model files, save to your personal model library, and visualize and analyze.
-                </Typography>
-              </CardContent>
-              <Box sx={{ p: 2 }}>
-                <Button 
-                  variant="contained" 
-                  fullWidth
-                  onClick={() => navigate('/upload')}
-                >
-                  Upload Model
-                </Button>
-              </Box>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={6}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <BuildIcon sx={{ fontSize: 48, mb: 2 }} />
@@ -237,7 +197,7 @@ const Home = () => {
               </Box>
             </Card>
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={6}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <StorageIcon sx={{ fontSize: 48, mb: 2 }} />

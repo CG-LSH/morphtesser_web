@@ -21,8 +21,8 @@ const Header = () => {
         <Box>
           {isAuthenticated ? (
             <>
-              <Button color="inherit" component={Link} to="/upload">
-                Upload Model
+              <Button color="inherit" component={Link} to="/online-builder">
+                Online Modeling
               </Button>
               <Button color="inherit" onClick={handleLogout}>
                 Logout

@@ -1,13 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useEffect, useState, useImperativeHandle } from 'react';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import CircularProgress from '@mui/material/CircularProgress';
-import Button from '@mui/material/Button';
 
-const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height = '100%' }) => {
+const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width = '100%', height = '100%', onResetView, onFocusSoma, backgroundColor = 0x000000 }, ref) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -20,52 +17,109 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
   const initialCameraState = useRef({ position: null, target: null });
   const swcGroupRef = React.useRef(null);
   const objGroupRef = React.useRef(null);
+  const viewModeRef = useRef(viewMode); // 添加viewMode的ref
+
+  // 更新viewModeRef
+  React.useEffect(() => {
+    viewModeRef.current = viewMode;
+  }, [viewMode]);
+
+  // 暴露方法给父组件
+  useImperativeHandle(ref, () => ({
+    resetView,
+    focusSoma
+  }), []);
 
   // 只在首次挂载时加载模型
   React.useEffect(() => {
+    // 检查WebGL支持
+    if (!mountRef.current) {
+      console.error('Mount ref is null');
+      return;
+    }
+
+    // 检查WebGL可用性
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) {
+      setError('WebGL is not supported in this browser');
+      setLoading(false);
+      return;
+    }
+
     // 初始化场景
     const initScene = () => {
-      // 创建场景
+      try {
+              // 创建场景
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xf0f0f0);
+      try {
+        scene.background = new THREE.Color(backgroundColor);
+      } catch (e) {
+        scene.background = new THREE.Color(0x000000);
+      }
       sceneRef.current = scene;
 
-      // 创建相机
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        mountRef.current.clientWidth / mountRef.current.clientHeight,
-        0.1,
-        1000
-      );
-      camera.position.z = 5;
-      cameraRef.current = camera;
+        // 创建相机
+        const camera = new THREE.PerspectiveCamera(
+          75,
+          mountRef.current.clientWidth / mountRef.current.clientHeight,
+          0.1,
+          1000
+        );
+        camera.position.z = 5;
+        cameraRef.current = camera;
 
-      // 创建渲染器
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
-      mountRef.current.appendChild(renderer.domElement);
-      rendererRef.current = renderer;
+        // 创建渲染器
+        const renderer = new THREE.WebGLRenderer({ 
+          antialias: true,
+          alpha: true,
+          preserveDrawingBuffer: false
+        });
+        renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+        mountRef.current.appendChild(renderer.domElement);
+        rendererRef.current = renderer;
 
       // 添加轨道控制
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controlsRef.current = controls;
 
-      // 添加灯光
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      // 添加灯光 - 多方向光照确保背面也能看清
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // 增加环境光强度
       scene.add(ambientLight);
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      // 主光源
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
       directionalLight.position.set(1, 1, 1);
       scene.add(directionalLight);
 
-      // 添加坐标轴辅助
-      const axesHelper = new THREE.AxesHelper(5);
-      scene.add(axesHelper);
+      // 添加背面光源
+      const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
+      backLight.position.set(-1, -1, -1);
+      scene.add(backLight);
 
-      // 添加网格
-      const gridHelper = new THREE.GridHelper(10, 10);
-      scene.add(gridHelper);
+      // // 添加顶部光源
+      // const topLight = new THREE.DirectionalLight(0xffffff, 0.3);
+      // topLight.position.set(0, 1, 0);
+      // scene.add(topLight);
+
+      // // 添加底部光源
+      // const bottomLight = new THREE.DirectionalLight(0xffffff, 0.2);
+      // bottomLight.position.set(0, -1, 0);
+      // scene.add(bottomLight);
+
+      // 不显示坐标轴和网格，保持界面简洁
+      // const axesHelper = new THREE.AxesHelper(5);
+      // scene.add(axesHelper);
+
+      // const gridHelper = new THREE.GridHelper(10, 10);
+      // scene.add(gridHelper);
+    } catch (error) {
+      console.error('初始化3D场景失败:', error);
+      setError('初始化3D场景失败: ' + error.message);
+      setLoading(false);
+      return;
+    }
     };
 
     // 加载OBJ模型
@@ -81,18 +135,24 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
           };
           object.traverse((child) => {
             if (child instanceof THREE.Mesh) {
+              // 计算法向量以实现平滑渲染
+              if (child.geometry) {
+                child.geometry.computeVertexNormals();
+              }
               child.material = new THREE.MeshPhongMaterial({
                 color: randomColor(),
                 specular: 0x111111,
                 shininess: 30,
-                transparent: true,
-                opacity: 0.5,
+                transparent: false,
+                opacity: 1.0,
+                flatShading: false, // 启用平滑着色
+                side: THREE.DoubleSide, // 双面渲染
               });
             }
           });
           object.name = 'objModel';
           objGroupRef.current = object;
-          object.visible = viewMode !== "swc";
+          object.visible = viewModeRef.current !== "swc";
           // 移除之前的OBJ模型
           const existingObj = sceneRef.current.getObjectByName('objModel');
           if (existingObj) {
@@ -100,18 +160,27 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
           }
           sceneRef.current.add(object);
 
-          // 居中模型
+          // 居中模型 - 使用固定的居中逻辑
           const box = new THREE.Box3().setFromObject(object);
           const size = box.getSize(new THREE.Vector3());
           const center = box.getCenter(new THREE.Vector3());
-          // 将OBJ整体居中到原点
-          object.position.sub(center);
+          
+          // 检查是否已经居中过，避免重复居中
+          if (Math.abs(center.x) > 0.1 || Math.abs(center.y) > 0.1 || Math.abs(center.z) > 0.1) {
+            // 将OBJ整体居中到原点
+            object.position.sub(center);
+            console.log('Centered OBJ model to origin');
+          } else {
+            console.log('OBJ model already centered');
+          }
 
           // 自适应相机参数
           const maxDim = Math.max(size.x, size.y, size.z);
           const fov = cameraRef.current.fov * (Math.PI / 180);
           let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
           cameraZ *= 1.2; // 适当拉远
+          
+          // 确保相机位置一致
           cameraRef.current.position.set(0, 0, cameraZ);
           cameraRef.current.near = maxDim / 100;
           cameraRef.current.far = maxDim * 10;
@@ -119,6 +188,16 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
           // 控制器目标设置为原点
           controlsRef.current.target.set(0, 0, 0);
           controlsRef.current.update();
+          
+          console.log('Camera position set to:', cameraRef.current.position);
+          console.log('Camera target set to:', controlsRef.current.target);
+          
+          // 保存初始相机状态
+          initialCameraState.current = {
+            position: cameraRef.current.position.clone(),
+            target: controlsRef.current.target.clone()
+          };
+          
           setLoading(false);
         },
         undefined,
@@ -137,10 +216,16 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
           const swcGroup = new THREE.Group();
           swcGroup.name = 'swcModel';
 
+          // 生成随机颜色函数
+          const randomColor = () => {
+            return Math.floor(Math.random() * 0xffffff);
+          };
+
           // 解析SWC文件
           const lines = data.split('\n');
           const nodes = {};
 
+          // 第一遍：收集所有节点
           for (let line of lines) {
             line = line.trim();
             if (line === '' || line.startsWith('#')) continue;
@@ -154,48 +239,67 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
             const radius = parseFloat(parts[5]);
             const parent = parseInt(parts[6]);
             nodes[id] = { id, type, x, y, z, radius, parent };
-            // 创建球体表示节点
-            const sphereGeometry = new THREE.SphereGeometry(radius, 8, 8);
-            const sphereMaterial = new THREE.MeshPhongMaterial({ 
-              color: getColorByType(type),
-              transparent: true,
-              opacity: 0.7
-            });
-            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-            sphere.position.set(x, y, z);
-            // 记录id到userData，便于聚焦soma
-            sphere.userData = { id };
-            swcGroup.add(sphere);
+          }
+
+          // 第二遍：创建圆柱体连接和soma球体（参考sharkviewer方式）
+          for (let id in nodes) {
+            const node = nodes[id];
+            const parent = node.parent;
+            
+            // 显示soma点（随机颜色球体）
+            if (node.type === 1) { // soma类型
+              const sphereGeometry = new THREE.SphereGeometry(node.radius, 8, 8);
+              const sphereMaterial = new THREE.MeshPhongMaterial({ 
+                color: randomColor(), // 随机颜色
+                transparent: false,
+                opacity: 1.0,
+                side: THREE.DoubleSide // 双面渲染
+              });
+              const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+              sphere.position.set(node.x, node.y, node.z);
+              sphere.userData = { id: node.id, type: node.type };
+              swcGroup.add(sphere);
+            }
+            
             // 如果有父节点，创建圆柱体连接
             if (parent !== -1 && nodes[parent]) {
               const parentNode = nodes[parent];
               const start = new THREE.Vector3(parentNode.x, parentNode.y, parentNode.z);
-              const end = new THREE.Vector3(x, y, z);
+              const end = new THREE.Vector3(node.x, node.y, node.z);
               const direction = new THREE.Vector3().subVectors(end, start);
               const length = direction.length();
-              const cylinderGeometry = new THREE.CylinderGeometry(
-                radius * 0.5,
-                parentNode.radius * 0.5,
-                length,
-                8,
-                1
-              );
-              const cylinderMaterial = new THREE.MeshPhongMaterial({ 
-                color: getColorByType(type),
-                transparent: true,
-                opacity: 0.7
-              });
-              const cylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
-              cylinder.position.copy(start);
-              cylinder.position.addScaledVector(direction, 0.5);
-              cylinder.lookAt(end);
-              cylinder.rotateX(Math.PI / 2);
-              swcGroup.add(cylinder);
+              
+              if (length > 0) {
+                // 严格符合半径的圆柱体
+                const cylinderGeometry = new THREE.CylinderGeometry(
+                  node.radius, // 当前节点半径
+                  parentNode.radius, // 父节点半径
+                  length,
+                  8, // 分段数
+                  1, // 高度分段
+                  false // 不开放
+                );
+                const cylinderMaterial = new THREE.MeshPhongMaterial({ 
+                  color: randomColor(), // 随机颜色
+                  transparent: false,
+                  opacity: 1.0,
+                  side: THREE.DoubleSide // 双面渲染
+                });
+                const cylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+                
+                // 设置圆柱体位置和方向
+                cylinder.position.copy(start);
+                cylinder.position.addScaledVector(direction, 0.5);
+                cylinder.lookAt(end);
+                cylinder.rotateX(Math.PI / 2);
+                cylinder.userData = { id: node.id, parentId: parent, type: node.type };
+                swcGroup.add(cylinder);
+              }
             }
           }
 
           swcGroupRef.current = swcGroup;
-          swcGroup.visible = viewMode !== "obj";
+          swcGroup.visible = viewModeRef.current !== "obj";
           // 移除之前的SWC模型
           const existingSwc = sceneRef.current.getObjectByName('swcModel');
           if (existingSwc) {
@@ -203,10 +307,17 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
           }
           sceneRef.current.add(swcGroup);
 
-          // 居中模型
+          // 居中模型 - 使用固定的居中逻辑
           const box = new THREE.Box3().setFromObject(swcGroup);
           const center = box.getCenter(new THREE.Vector3());
-          swcGroup.position.sub(center);
+          
+          // 检查是否已经居中过，避免重复居中
+          if (Math.abs(center.x) > 0.1 || Math.abs(center.y) > 0.1 || Math.abs(center.z) > 0.1) {
+            swcGroup.position.sub(center);
+            console.log('Centered SWC model to origin');
+          } else {
+            console.log('SWC model already centered');
+          }
 
           // 调整相机位置
           const size = box.getSize(new THREE.Vector3());
@@ -214,9 +325,22 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
           const fov = cameraRef.current.fov * (Math.PI / 180);
           let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
           cameraZ *= 1.0;
-          cameraRef.current.position.set(center.x, center.y, center.z + cameraZ);
-          controlsRef.current.target.copy(center);
+          
+          // 确保相机位置一致 - 使用居中的模型位置
+          const centeredCenter = new THREE.Vector3(0, 0, 0); // 因为模型已经居中到原点
+          cameraRef.current.position.set(centeredCenter.x, centeredCenter.y, centeredCenter.z + cameraZ);
+          controlsRef.current.target.copy(centeredCenter);
           controlsRef.current.update();
+          
+          console.log('SWC Camera position set to:', cameraRef.current.position);
+          console.log('SWC Camera target set to:', controlsRef.current.target);
+          
+          // 保存初始相机状态
+          initialCameraState.current = {
+            position: cameraRef.current.position.clone(),
+            target: controlsRef.current.target.clone()
+          };
+          
           // 记录相机和target
           swcGroup.userData.cameraPosition = cameraRef.current.position.clone();
           swcGroup.userData.cameraTarget = controlsRef.current.target.clone();
@@ -278,7 +402,7 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
 
     // 记录初始相机参数
     setTimeout(() => {
-      if (cameraRef.current && controlsRef.current) {
+      if (cameraRef.current && controlsRef.current && !initialCameraState.current.position) {
         initialCameraState.current.position = cameraRef.current.position.clone();
         initialCameraState.current.target = controlsRef.current.target.clone();
       }
@@ -317,103 +441,43 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
 
   // 监听viewMode变化，切换visible
   React.useEffect(() => {
-    if (swcGroupRef.current) swcGroupRef.current.visible = viewMode !== "obj";
-    if (objGroupRef.current) objGroupRef.current.visible = viewMode !== "swc";
+    if (swcGroupRef.current) swcGroupRef.current.visible = viewModeRef.current !== "obj";
+    if (objGroupRef.current) objGroupRef.current.visible = viewModeRef.current !== "swc";
+    
+    // 移除对保存的soma聚焦视野的应用，让SWC/MESH切换保持独立
+    // 当切换到MESH模式时，如果有保存的soma聚焦视野，则应用它
+    // if (viewModeRef.current === 'obj' && swcGroupRef.current && swcGroupRef.current.userData.somaFocusPosition) {
+    //   console.log('Applying saved soma focus view to MESH mode');
+    //   cameraRef.current.position.copy(swcGroupRef.current.userData.somaFocusPosition);
+    //   controlsRef.current.target.copy(swcGroupRef.current.userData.somaFocusTarget);
+    //   controlsRef.current.update();
+    // }
+    // 注意：不在这里重置相机位置，保持用户当前的视角
   }, [viewMode]);
 
-  // 聚焦soma功能（OBJ模式下直接用swc的相机和target）
-  const focusSoma = () => {
-    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return;
-    let targetMesh = null;
-    const swcGroup = sceneRef.current.getObjectByName('swcModel');
-    const objGroup = sceneRef.current.getObjectByName('objModel');
-    // OBJ模式：如果有swc，直接用swc的相机和target
-    if (objGroup && swcGroup && swcGroup.userData.cameraPosition && swcGroup.userData.cameraTarget) {
-      cameraRef.current.position.copy(swcGroup.userData.cameraPosition);
-      controlsRef.current.target.copy(swcGroup.userData.cameraTarget);
+  // 重置视角功能：恢复初始加载视角
+  const resetView = React.useCallback(() => {
+    console.log('resetView function called');
+    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) {
+      console.log('Scene, camera, or controls not available');
+      return;
+    }
+    
+    // 恢复初始相机状态
+    if (initialCameraState.current.position && initialCameraState.current.target) {
+      console.log('Restoring initial camera state');
+      cameraRef.current.position.copy(initialCameraState.current.position);
+      controlsRef.current.target.copy(initialCameraState.current.target);
       controlsRef.current.update();
       return;
     }
-    // SWC模式或无swc时，原有逻辑
-    if (swcGroup) {
-      let somaMesh = null;
-      swcGroup.traverse(obj => {
-        if (obj.isMesh && obj.geometry.type === 'SphereGeometry' && obj.userData && (obj.userData.id === 0 || obj.userData.id === 1)) {
-          somaMesh = obj;
-        }
-      });
-      if (!somaMesh) {
-        swcGroup.traverse(obj => {
-          if (!somaMesh && obj.isMesh && obj.geometry.type === 'SphereGeometry') somaMesh = obj;
-        });
-      }
-      if (somaMesh) targetMesh = somaMesh;
-    }
-    if (!targetMesh) {
-      if (objGroup) {
-        let allVertices = [];
-        objGroup.traverse(obj => {
-          if (obj.isMesh && obj.geometry && obj.geometry.isBufferGeometry) {
-            const posAttr = obj.geometry.attributes.position;
-            if (posAttr && posAttr.count > 0) {
-              for (let i = 0; i < posAttr.count; i++) {
-                const v = new THREE.Vector3().fromBufferAttribute(posAttr, i);
-                allVertices.push(v);
-              }
-            }
-          }
-        });
-        if (allVertices.length > 0) {
-          const n = Math.max(3, Math.ceil(allVertices.length * 0.01));
-          const focusVerts = allVertices.slice(0, n);
-          let sum = new THREE.Vector3(0,0,0);
-          let min = new THREE.Vector3(Infinity,Infinity,Infinity);
-          let max = new THREE.Vector3(-Infinity,-Infinity,-Infinity);
-          focusVerts.forEach(v => {
-            sum.add(v);
-            min.min(v);
-            max.max(v);
-          });
-          const center = sum.clone().divideScalar(focusVerts.length);
-          const size = new THREE.Vector3().subVectors(max, min);
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const fov = cameraRef.current.fov * (Math.PI / 180);
-          let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-          cameraZ *= 0.5;
-          cameraRef.current.position.set(center.x, center.y, center.z + cameraZ);
-          controlsRef.current.target.copy(center);
-          controlsRef.current.update();
-          return;
-        }
-        let fallbackMesh = null;
-        objGroup.traverse(obj => {
-          if (!fallbackMesh && obj.isMesh) fallbackMesh = obj;
-        });
-        if (fallbackMesh) {
-          const center = fallbackMesh.position.clone();
-          cameraRef.current.position.set(center.x, center.y, center.z + 10);
-          controlsRef.current.target.copy(center);
-          controlsRef.current.update();
-        }
-      }
-    } else {
-      const center = targetMesh.position.clone();
-      const radius = targetMesh.geometry && targetMesh.geometry.parameters && targetMesh.geometry.parameters.radius ? targetMesh.geometry.parameters.radius : 1;
-      const fov = cameraRef.current.fov * (Math.PI / 180);
-      let cameraZ = Math.abs(radius / Math.tan(fov / 2)) * 2.2;
-      cameraRef.current.position.set(center.x, center.y, center.z + cameraZ);
-      controlsRef.current.target.copy(center);
-      controlsRef.current.update();
-    }
-  };
-
-  // 重置视角功能：恢复自适应视角
-  const resetView = () => {
-    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return;
+    
+    console.log('No initial state, using default view');
+    // 如果没有初始状态，则使用默认视角
     let group = null;
-    if (viewMode === 'obj') {
+    if (viewModeRef.current === 'obj') {
       group = sceneRef.current.getObjectByName('objModel');
-    } else if (viewMode === 'swc') {
+    } else if (viewModeRef.current === 'swc') {
       group = sceneRef.current.getObjectByName('swcModel');
     } else {
       // both模式优先OBJ
@@ -423,33 +487,138 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
       const box = new THREE.Box3().setFromObject(group);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
-      // 居中
-      group.position.sub(center);
-      // 相机自适应
+      
+      // 相机自适应 - 不修改模型位置，只调整相机
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = cameraRef.current.fov * (Math.PI / 180);
       let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-      cameraZ *= (viewMode === 'obj' ? 1.2 : 1.0);
-      if (viewMode === 'obj') {
-        cameraRef.current.position.set(0, 0, cameraZ);
-        controlsRef.current.target.set(0, 0, 0);
-      } else {
-        cameraRef.current.position.set(center.x, center.y, center.z + cameraZ);
-        controlsRef.current.target.copy(center);
-      }
+      cameraZ *= (viewModeRef.current === 'obj' ? 1.2 : 1.0);
+      
+      // 设置相机位置和目标，不修改模型位置
+      cameraRef.current.position.set(center.x, center.y, center.z + cameraZ);
+      controlsRef.current.target.copy(center);
       cameraRef.current.near = maxDim / 100;
       cameraRef.current.far = maxDim * 10;
       cameraRef.current.updateProjectionMatrix();
       controlsRef.current.update();
     }
-  };
+  }, []); // 移除 viewMode 依赖，使用 ref 来获取当前值
+
+  // 聚焦soma功能：聚焦SWC的soma节点，并将相同视角应用到mesh
+  const focusSoma = React.useCallback(() => {
+    console.log('focusSoma function called');
+    if (!sceneRef.current || !cameraRef.current || !controlsRef.current) {
+      console.log('Scene, camera, or controls not available');
+      return;
+    }
+    
+    // 首先尝试找到SWC的soma节点（红色球）
+    const swcGroup = sceneRef.current.getObjectByName('swcModel');
+    let somaMesh = null;
+    let somaPosition = null;
+    
+    if (swcGroup) {
+      console.log('Found SWC group, searching for soma (red sphere)');
+      // 寻找soma节点（红色球体，通常是id为0或1的球体）
+      swcGroup.traverse(obj => {
+        if (obj.isMesh && obj.geometry.type === 'SphereGeometry' && obj.userData && (obj.userData.id === 0 || obj.userData.id === 1)) {
+          somaMesh = obj;
+          somaPosition = obj.position.clone();
+          console.log('Found soma with id:', obj.userData.id, 'at position:', somaPosition);
+        }
+      });
+      
+      // 如果没找到id为0或1的，寻找第一个红色球体
+      if (!somaMesh) {
+        console.log('No soma with id 0 or 1, searching for any red sphere');
+        swcGroup.traverse(obj => {
+          if (!somaMesh && obj.isMesh && obj.geometry.type === 'SphereGeometry' && obj.material && obj.material.color && obj.material.color.getHex() === 0xff0000) {
+            somaMesh = obj;
+            somaPosition = obj.position.clone();
+            console.log('Found first red sphere as soma at position:', somaPosition);
+          }
+        });
+      }
+      
+      // 如果还是没找到，寻找任何球体
+      if (!somaMesh) {
+        console.log('No red sphere found, searching for any sphere');
+        swcGroup.traverse(obj => {
+          if (!somaMesh && obj.isMesh && obj.geometry.type === 'SphereGeometry') {
+            somaMesh = obj;
+            somaPosition = obj.position.clone();
+            console.log('Found first sphere as soma at position:', somaPosition);
+          }
+        });
+      }
+    }
+    
+    if (somaPosition) {
+      console.log('Focusing on soma at position:', somaPosition);
+      
+      // 考虑SWC模型的居中偏移
+      const worldPosition = somaPosition.clone();
+      worldPosition.add(swcGroup.position);
+      console.log('Soma world position (after centering):', worldPosition);
+      
+      // 计算聚焦到soma的相机位置
+      const radius = somaMesh.geometry && somaMesh.geometry.parameters && somaMesh.geometry.parameters.radius ? somaMesh.geometry.parameters.radius : 1;
+      const fov = cameraRef.current.fov * (Math.PI / 180);
+      let cameraZ = Math.abs(radius / Math.tan(fov / 2)) * 3.0; // 增加距离确保红色球在视野中心
+      
+      // 设置相机位置和目标，确保红色球在视角中心
+      cameraRef.current.position.set(worldPosition.x, worldPosition.y, worldPosition.z + cameraZ);
+      controlsRef.current.target.copy(worldPosition);
+      controlsRef.current.update();
+      
+      console.log('Camera position set to:', cameraRef.current.position);
+      console.log('Camera target set to:', controlsRef.current.target);
+      
+      // 移除对userData的修改，避免影响SWC/MESH视角切换
+      // if (swcGroup) {
+      //   swcGroup.userData.somaFocusPosition = cameraRef.current.position.clone();
+      //   swcGroup.userData.somaFocusTarget = controlsRef.current.target.clone();
+      //   console.log('Saved soma focus view for MESH mode');
+      // }
+    } else {
+      console.log('No soma found, focusing on model center');
+      // 如果没有找到soma，使用模型中心
+      let group = null;
+      if (viewModeRef.current === 'obj') {
+        group = sceneRef.current.getObjectByName('objModel');
+      } else if (viewModeRef.current === 'swc') {
+        group = sceneRef.current.getObjectByName('swcModel');
+      } else {
+        group = sceneRef.current.getObjectByName('objModel') || sceneRef.current.getObjectByName('swcModel');
+      }
+      
+      if (group) {
+        const box = new THREE.Box3().setFromObject(group);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = cameraRef.current.fov * (Math.PI / 180);
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 0.5; // 更近的视角
+        
+        cameraRef.current.position.set(center.x, center.y, center.z + cameraZ);
+        controlsRef.current.target.copy(center);
+        controlsRef.current.update();
+      }
+    }
+  }, []); // 移除 viewMode 依赖，使用 ref 来获取当前值
+
+  // 移除之前的函数暴露机制，现在使用ref
+  // React.useEffect(() => {
+  //   if (onResetView) {
+  //     onResetView(resetView);
+  //   }
+  //   if (onFocusSoma) {
+  //     onFocusSoma(focusSoma);
+  //   }
+  // }, [onResetView, onFocusSoma]); // 移除 resetView 和 focusSoma 依赖
 
   return (
     <Box sx={{ width, height, position: 'relative' }}>
-      <Box sx={{ position: 'absolute', top: 8, right: 8, zIndex: 10, display: 'flex', gap: 1 }}>
-        <Button variant="outlined" size="small" onClick={resetView}>Reset View</Button>
-        <Button variant="outlined" size="small" onClick={focusSoma}>Focus Soma</Button>
-      </Box>
       {loading && (
         <Box sx={{ 
           position: 'absolute', 
@@ -485,6 +654,6 @@ const ModelViewer = ({ objUrl, swcUrl, viewMode = "both", width = '100%', height
       <Box ref={mountRef} sx={{ width: '100%', height: '100%' }} />
     </Box>
   );
-};
+});
 
 export default ModelViewer; 
