@@ -12,5 +12,13 @@ public interface PythonService {
      */
     Map<String, Object> convertSwcToObj(String swcFilePath);
 
+    /**
+     * 将OBJ文件压缩为Draco格式
+     * 
+     * @param objFilePath OBJ文件路径
+     * @return 包含压缩结果的Map，包括压缩文件路径和压缩统计
+     */
+    Map<String, Object> compressObjToDraco(String objFilePath);
+
     Map<String, Object> processSWCFile(String filePath);
 } 

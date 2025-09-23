@@ -15,18 +15,16 @@ import java.util.Random;
 @Service
 public class SmbFileService {
 
-    // 本地文件夹路径 - 使用guest目录
-    private static final String LOCAL_BASE_PATH = "Z:/lsh/morphtesser_exp/DataSet/guest";
+    // 本地文件夹路径 - 使用neuromorpho_08结果目录
+    private static final String LOCAL_BASE_PATH = "X:/morphtesser_exp/neuromorpho_08/results";
     
-    // 文件大小限制：20MB
-    private static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB in bytes
+    // 文件大小限制：无限制
+    // private static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 已移除大小限制
 
     public byte[] readObj(String id, String quality) throws IOException {
-        // 忽略传入的ID，随机选择OBJ文件
-        System.out.println("收到请求 - ID: " + id + ", 质量: " + quality + "，将随机选择不超过20MB的OBJ文件");
-        
         // 检查基础路径是否存在
         Path basePath = Paths.get(LOCAL_BASE_PATH);
+        
         if (!Files.exists(basePath)) {
             throw new IOException("基础路径不存在: " + basePath.toAbsolutePath());
         }
@@ -37,22 +35,138 @@ public class SmbFileService {
             throw new IOException("基础路径不可读: " + basePath.toAbsolutePath());
         }
 
-        // 递归查找所有符合条件的OBJ文件（不超过20MB）
-        List<Path> validObjFiles = findValidObjFiles(basePath);
-        if (validObjFiles.isEmpty()) {
-            throw new IOException("在 " + basePath.toAbsolutePath() + " 目录中未找到任何不超过20MB的OBJ文件");
+        // 根据ID查找对应的OBJ文件
+        Path targetFile = findObjById(basePath, id, quality);
+        if (targetFile == null) {
+            throw new IOException("未找到ID为 " + id + " 的OBJ文件");
         }
 
-        // 随机选择一个符合条件的OBJ文件
-        Random random = new Random();
-        Path selectedFile = validObjFiles.get(random.nextInt(validObjFiles.size()));
-        System.out.println("随机选择的文件: " + selectedFile.toAbsolutePath() + " (大小: " + formatFileSize(Files.size(selectedFile)) + ")");
+        return readFileContent(targetFile);
+    }
 
-        return readFileContent(selectedFile);
+    public byte[] readDraco(String id, String quality) throws IOException {
+        // 检查基础路径是否存在
+        Path basePath = Paths.get(LOCAL_BASE_PATH);
+        
+        if (!Files.exists(basePath)) {
+            throw new IOException("基础路径不存在: " + basePath.toAbsolutePath());
+        }
+        if (!Files.isDirectory(basePath)) {
+            throw new IOException("基础路径不是目录: " + basePath.toAbsolutePath());
+        }
+        if (!Files.isReadable(basePath)) {
+            throw new IOException("基础路径不可读: " + basePath.toAbsolutePath());
+        }
+
+        // 根据ID查找对应的DRC文件
+        Path targetFile = findDracoById(basePath, id, quality);
+        if (targetFile == null) {
+            throw new IOException("未找到ID为 " + id + " 的DRC文件");
+        }
+
+        return readFileContent(targetFile);
     }
 
     /**
-     * 递归查找目录中所有符合条件的OBJ文件（不超过20MB）
+     * 根据ID查找对应的OBJ文件
+     * 查找路径格式：X:/morphtesser_exp/neuromorpho_08/results/{前三位}/{id}.swc/data_{quality}.obj
+     * 注意：查找目录时需要补0，但查找具体文件时使用原始ID
+     */
+    private Path findObjById(Path basePath, String id, String quality) throws IOException {
+        // 将ID转换为数字，然后格式化为6位数字（不足6位前面补0）
+        int idNum;
+        try {
+            idNum = Integer.parseInt(id);
+        } catch (NumberFormatException e) {
+            throw new IOException("ID格式无效: " + id);
+        }
+        
+        // 格式化为6位数字，不足6位前面补0（用于查找目录）
+        String formattedId = String.format("%06d", idNum);
+        
+        // 获取ID的前三位作为目录名
+        String prefix = formattedId.substring(0, 3);
+        Path idDir = basePath.resolve(prefix);
+        
+        if (!Files.exists(idDir) || !Files.isDirectory(idDir)) {
+            return null;
+        }
+        
+        // 查找对应的.swc目录（使用原始ID，不补0）
+        try (var stream = Files.list(idDir)) {
+            for (Path path : stream.collect(java.util.stream.Collectors.toList())) {
+                String fileName = path.getFileName().toString();
+                
+                if (fileName.equals(id + ".swc") && Files.isDirectory(path)) {
+                    // 在.swc目录中查找OBJ文件
+                    String objFileName = "data_" + quality + ".obj";
+                    Path objFile = path.resolve(objFileName);
+                    
+                    if (Files.exists(objFile) && Files.isRegularFile(objFile) && Files.size(objFile) > 0) {
+                        return objFile;
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * 根据ID查找对应的DRC文件
+     * 查找路径格式：X:/morphtesser_exp/neuromorpho_08/results/{前三位}/{id}.swc/data_{quality}.drc
+     * 注意：查找目录时需要补0，但查找具体文件时使用原始ID
+     */
+    private Path findDracoById(Path basePath, String id, String quality) throws IOException {
+        // 将ID转换为数字，然后格式化为6位数字（不足6位前面补0）
+        int idNum;
+        try {
+            idNum = Integer.parseInt(id);
+        } catch (NumberFormatException e) {
+            throw new IOException("ID格式无效: " + id);
+        }
+        
+        // 格式化为6位数字，不足6位前面补0（用于查找目录）
+        String formattedId = String.format("%06d", idNum);
+        
+        // 获取ID的前三位作为目录名
+        String prefix = formattedId.substring(0, 3);
+        Path idDir = basePath.resolve(prefix);
+        
+        if (!Files.exists(idDir) || !Files.isDirectory(idDir)) {
+            return null;
+        }
+        
+        // 查找对应的.swc目录（使用原始ID，不补0）
+        try (var stream = Files.list(idDir)) {
+            for (Path path : stream.collect(java.util.stream.Collectors.toList())) {
+                String fileName = path.getFileName().toString();
+                
+                if (fileName.equals(id + ".swc") && Files.isDirectory(path)) {
+                    // 在.swc目录中查找DRC文件
+                    // 尝试多种命名规则
+                    String[] dracoPatterns = {
+                        "data_" + quality + ".drc",           // data_refined.drc
+                        "data_" + quality + "_qp14.drc",      // data_refined_qp14.drc
+                        "data_" + quality + "_qp10.drc",      // data_refined_qp10.drc
+                        "data_" + quality + "_qp7.drc"        // data_refined_qp7.drc
+                    };
+                    
+                    for (String dracoFileName : dracoPatterns) {
+                        Path dracoFile = path.resolve(dracoFileName);
+                        if (Files.exists(dracoFile) && Files.isRegularFile(dracoFile) && Files.size(dracoFile) > 0) {
+                            return dracoFile;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * 递归查找目录中所有OBJ文件（无大小限制）
      */
     private List<Path> findValidObjFiles(Path directory) throws IOException {
         List<Path> validObjFiles = new ArrayList<>();
@@ -67,15 +181,13 @@ public class SmbFileService {
                     String fileName = path.getFileName().toString().toLowerCase();
                     return fileName.endsWith(".obj") && 
                            Files.isRegularFile(path) && 
-                           Files.size(path) <= MAX_FILE_SIZE;
+                           Files.size(path) > 0; // 只检查是否为空文件
                 } catch (IOException e) {
-                    System.err.println("检查文件大小时出错: " + path + ", 错误: " + e.getMessage());
                     return false;
                 }
             }).forEach(validObjFiles::add);
         }
 
-        System.out.println("在目录 " + directory.toAbsolutePath() + " 中找到 " + validObjFiles.size() + " 个不超过20MB的OBJ文件");
         return validObjFiles;
     }
 
@@ -83,8 +195,6 @@ public class SmbFileService {
      * 读取文件内容
      */
     private byte[] readFileContent(Path filePath) throws IOException {
-        System.out.println("开始读取文件: " + filePath.toAbsolutePath());
-        
         if (!Files.exists(filePath)) {
             throw new IOException("文件不存在: " + filePath.toAbsolutePath());
         }
@@ -96,12 +206,11 @@ public class SmbFileService {
         // 检查文件大小
         try {
             long fileSize = Files.size(filePath);
-            System.out.println("文件大小: " + fileSize + " 字节");
             if (fileSize == 0) {
                 throw new IOException("文件大小为0字节: " + filePath.toAbsolutePath());
             }
         } catch (IOException e) {
-            System.err.println("无法获取文件大小: " + e.getMessage());
+            // 忽略文件大小检查错误
         }
         
         try (InputStream in = Files.newInputStream(filePath);
@@ -111,10 +220,8 @@ public class SmbFileService {
             while ((n = in.read(buf)) > 0) {
                 bos.write(buf, 0, n);
             }
-            System.out.println("成功读取文件: " + filePath.toAbsolutePath() + ", 大小: " + bos.size() + " 字节");
             return bos.toByteArray();
         } catch (IOException e) {
-            System.err.println("读取文件失败: " + filePath.toAbsolutePath() + ", 错误: " + e.getMessage());
             throw e;
         }
     }

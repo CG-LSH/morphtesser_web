@@ -28,13 +28,13 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
-      return (
-        <Box sx={{ 
+    return (
+      <Box sx={{
           height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column',
-          alignItems: 'center', 
-          justifyContent: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
           backgroundColor: '#f5f5f5',
           borderRadius: 1
         }}>
@@ -52,9 +52,9 @@ class ErrorBoundary extends React.Component {
           >
             重试
           </Button>
-        </Box>
-      );
-    }
+      </Box>
+    );
+  }
 
     return this.props.children;
   }
@@ -281,9 +281,6 @@ const OnlineBuilder = () => {
     <Box
       sx={{
       minHeight: '100vh',
-      backgroundImage: neuronBg,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
       position: 'relative',
       py: 4,
         display: 'flex',
@@ -446,7 +443,7 @@ const OnlineBuilder = () => {
             <Button variant="contained" sx={{ minWidth: 180, fontSize: 18, backgroundColor: '#004d40', '&:hover': { backgroundColor: '#00332c' } }} onClick={handleZipAllMesh}>ZIP ALL MESH</Button>
             <Button variant="contained" color="error" sx={{ minWidth: 180, fontSize: 18 }} onClick={handleClearResult}>CLEAR</Button>
           </Box>
-        </Box>
+              </Box>
       </Paper>
 
       {/* 3D模型查看器对话框 - 与数据库页面保持一致 */}
@@ -535,7 +532,7 @@ const OnlineBuilder = () => {
                       <Tab value="both" label="BOTH" />
                     )}
                   </Tabs>
-                </Box>
+                  </Box>
                 
                 {/* 右侧：控制按钮 */}
                 <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
@@ -561,7 +558,7 @@ const OnlineBuilder = () => {
                   >
                     Reset View
                   </Button>
-                  <Button 
+                  <Button
                     variant="outlined" 
                     size="small" 
                     sx={{ 
@@ -614,6 +611,7 @@ const OnlineBuilder = () => {
                 <ErrorBoundary>
                   <ModelViewer
                     objUrl={selectedModel.objUrl}
+                    dracoUrl={selectedModel.dracoUrl}
                     swcUrl={selectedModel.swcUrl}
                     viewMode={viewMode}
                     width="100%"
@@ -624,9 +622,9 @@ const OnlineBuilder = () => {
                 </ErrorBoundary>
               </Box>
             </Box>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </DialogContent>
+        </Dialog>
     </Box>
   );
 };

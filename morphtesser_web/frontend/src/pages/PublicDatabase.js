@@ -675,9 +675,6 @@ const PublicDatabase = () => {
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      backgroundImage: neuronBg,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
       position: 'relative',
       py: 4,
       '&::before': {
@@ -708,11 +705,19 @@ const PublicDatabase = () => {
         </Typography>
         
         <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 4, 
-          '& .MuiTab-root': { color: 'white' },
-          '& .Mui-selected': { color: '#3f51b5 !important', fontWeight: 'bold' }
+          '& .MuiTab-root': { 
+            color: 'white',
+            textTransform: 'none',
+            fontSize: '16px'
+          },
+          '& .Mui-selected': { 
+            color: '#3f51b5 !important', 
+            fontWeight: 'bold',
+            textTransform: 'none'
+          }
         }}>
-          <Tab label="Public Models" />
-          <Tab label="Public Datasets" />
+          <Tab label="NeuroMorpho.org" />
+          <Tab label="Public Whole Brain Datasets" />
         </Tabs>
         
         {tabValue === 0 && (

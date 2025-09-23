@@ -81,6 +81,52 @@ public class PythonServiceImpl implements PythonService {
     }
 
     @Override
+    public Map<String, Object> compressObjToDraco(String objFilePath) {
+        try {
+            logger.info("调用Python服务压缩OBJ到Draco: {}", objFilePath);
+            
+            // 准备请求头
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            
+            // 创建文件资源
+            org.springframework.core.io.Resource fileResource = 
+                new org.springframework.core.io.FileSystemResource(objFilePath);
+            
+            // 创建多部分请求
+            org.springframework.util.LinkedMultiValueMap<String, Object> body = 
+                new org.springframework.util.LinkedMultiValueMap<>();
+            body.add("file", fileResource);
+            body.add("compression_level", 7);
+            body.add("quantization_bits", 10);
+            
+            // 创建请求实体
+            HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> requestEntity = 
+                new HttpEntity<>(body, headers);
+            
+            // 发送请求
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    pythonServiceUrl + "/compress/", requestEntity, String.class);
+            
+            // 解析响应
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> result = objectMapper.readValue(
+                        response.getBody(), new TypeReference<Map<String, Object>>() {});
+                
+                logger.info("Draco压缩成功: {}", result);
+                return result;
+            } else {
+                logger.error("Python服务Draco压缩响应错误: {}", response.getStatusCode());
+                return null;
+            }
+            
+        } catch (Exception e) {
+            logger.error("调用Python服务Draco压缩失败", e);
+            return null;
+        }
+    }
+
+    @Override
     public Map<String, Object> processSWCFile(String swcFilePath) {
         try {
             // 创建输出OBJ文件路径

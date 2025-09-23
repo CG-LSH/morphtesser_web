@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -15,6 +14,7 @@ import OnlineBuilder from './pages/OnlineBuilder';
 import PublicDatabase from './pages/PublicDatabase';
 import Profile from './pages/Profile';
 import EmbedMesh from './pages/EmbedMesh';
+import NeuroMorphoPlugin from './pages/NeuroMorphoPlugin';
 import './App.css';
 import NeuronPattern from './assets/images/neuron-pattern';
 import axios from 'axios';
@@ -34,12 +34,19 @@ const theme = createTheme({
 function AppShell() {
   const location = useLocation();
   const isEmbed = location.pathname.startsWith('/embed/');
-  const [currentUser, setCurrentUser] = useState(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const neuronPatternBg = NeuronPattern();
   
   useEffect(() => {
+    document.body.style.backgroundColor = 'black';
     document.body.style.backgroundImage = neuronPatternBg;
+    document.body.style.backgroundSize = '100% 100%';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundRepeat = 'no-repeat';
+    document.body.style.backgroundAttachment = 'fixed';
+    document.body.style.minHeight = '100vh';
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.overflow = 'auto';
   }, [neuronPatternBg]);
 
   useEffect(() => {
@@ -52,64 +59,12 @@ function AppShell() {
   useEffect(() => {
     const user = AuthService.getCurrentUser();
     if (user) {
-      setCurrentUser(user);
       setIsAuthenticated(true);
     }
   }, []);
 
-  const logOut = () => {
-    AuthService.logout();
-    localStorage.removeItem('user');
-    axios.defaults.headers.common['Authorization'] = null;
-    setCurrentUser(undefined);
-    setIsAuthenticated(false);
-    window.location.href = '/';
-  };
-
   return (
     <div className="App">
-      {!isEmbed && (
-      <nav className="top-navbar">
-        <div className="container">
-          <div className="navbar-nav">
-            <li className="nav-item">
-              <Link to={"/"} className="nav-link">
-                Home
-              </Link>
-            </li>
-          </div>
-
-          {currentUser ? (
-            <div className="navbar-nav ml-auto">
-              <li className="nav-item">
-                <Link to={"/profile"} className="nav-link">
-                  My Account
-                </Link>
-              </li>
-              <li className="nav-item">
-                <a href="/" className="nav-link" onClick={logOut}>
-                  Logout
-                </a>
-              </li>
-            </div>
-          ) : (
-            <div className="navbar-nav ml-auto">
-              <li className="nav-item">
-                <Link to={"/login"} className="nav-link">
-                  Login
-                </Link>
-              </li>
-              <li className="nav-item">
-                <Link to={"/register"} className="nav-link">
-                  Register
-                </Link>
-              </li>
-            </div>
-          )}
-        </div>
-      </nav>
-      )}
-      {!isEmbed && <Header />}
       <main className="main-content" style={isEmbed ? { padding: 0, margin: 0 } : undefined}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -120,6 +75,7 @@ function AppShell() {
 
           <Route path="/online-builder" element={isAuthenticated ? <OnlineBuilder /> : <Navigate to="/login" />} />
           <Route path="/public-database" element={<PublicDatabase />} />
+          <Route path="/neuromorpho-plugin" element={<NeuroMorphoPlugin />} />
           <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
           <Route path="/embed/mesh/:id" element={<EmbedMesh />} />
         </Routes>

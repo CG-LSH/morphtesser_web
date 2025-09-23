@@ -57,6 +57,12 @@ public class NeuronModel {
     @Column(name = "obj_file_path")
     private String objFilePath;
 
+    @Column(name = "draco_file_path")
+    private String dracoFilePath;
+
+    @Column(name = "compression_ratio")
+    private Double compressionRatio;
+
     @Column(name = "preview_image_path")
     private String previewImagePath;
 
@@ -191,6 +197,22 @@ public class NeuronModel {
 
     public void setObjFilePath(String objFilePath) {
         this.objFilePath = objFilePath;
+    }
+
+    public String getDracoFilePath() {
+        return dracoFilePath;
+    }
+
+    public void setDracoFilePath(String dracoFilePath) {
+        this.dracoFilePath = dracoFilePath;
+    }
+
+    public Double getCompressionRatio() {
+        return compressionRatio;
+    }
+
+    public void setCompressionRatio(Double compressionRatio) {
+        this.compressionRatio = compressionRatio;
     }
 
     public String getPreviewImagePath() {

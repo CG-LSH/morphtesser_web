@@ -58,8 +58,21 @@ const getModelFileUrl = (id, type) => {
   return `${API_URL}/${id}/file/${type}?token=${localStorage.getItem('token')}`;
 };
 
+const getDracoFileUrl = (id) => {
+  return `${API_URL}/${id}/file/draco?token=${localStorage.getItem('token')}`;
+};
+
 const downloadModelFile = (id, type) => {
   return axios.get(API_URL + '/' + id + '/download/' + type, {
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('token')}`
+    },
+    responseType: 'blob'
+  });
+};
+
+const downloadDracoFile = (id) => {
+  return axios.get(API_URL + '/' + id + '/download/draco', {
     headers: {
       'Authorization': `Bearer ${localStorage.getItem('token')}`
     },
@@ -94,7 +107,9 @@ const modelService = {
   getUserModels,
   deleteModel,
   getModelFileUrl,
+  getDracoFileUrl,
   downloadModelFile,
+  downloadDracoFile,
   createModel,
   createModelFromOnlineBuilder
 };

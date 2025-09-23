@@ -16,78 +16,55 @@ const NeuronAnimation = () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // 神经元树结构类
-    class NeuronBranch {
-      constructor(x, y, angle, depth) {
-        this.x = x;
-        this.y = y;
-        this.angle = angle;
-        this.depth = depth;
-        this.length = Math.random() * 20 + 10;
-        this.branches = [];
-        this.growing = true;
-        this.currentLength = 0;
-        this.pulsePhase = Math.random() * Math.PI * 2;
-        this.pulseSpeed = 0.02;
-        
-        if (depth > 0) {
-          const branchCount = Math.floor(Math.random() * 2) + 1;
-          for (let i = 0; i < branchCount; i++) {
-            const newAngle = angle + (Math.random() - 0.5) * Math.PI / 2;
-            this.branches.push(new NeuronBranch(
-              x + Math.cos(angle) * this.length,
-              y + Math.sin(angle) * this.length,
-              newAngle,
-              depth - 1
-            ));
-          }
-        }
-      }
-
-      draw(ctx, time) {
-        if (this.growing) {
-          this.currentLength += 0.5;
-          if (this.currentLength >= this.length) {
-            this.growing = false;
-          }
-        }
-
-        // 计算脉冲效果
-        const pulse = Math.sin(this.pulsePhase + time * this.pulseSpeed);
-        const opacity = 0.3 + 0.2 * pulse;
-        const width = this.depth + 1 + pulse * 0.5;
-
-        const endX = this.x + Math.cos(this.angle) * this.currentLength;
-        const endY = this.y + Math.sin(this.angle) * this.currentLength;
-
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(endX, endY);
-        ctx.strokeStyle = `rgba(100, 149, 237, ${opacity})`;
-        ctx.lineWidth = width;
-        ctx.stroke();
-
-        this.branches.forEach(branch => branch.draw(ctx, time));
-      }
-    }
-
-    // 创建多个神经元树
-    const neurons = [];
-    for (let i = 0; i < 8; i++) {
-      neurons.push(new NeuronBranch(
-        Math.random() * canvas.width,
-        Math.random() * canvas.height,
-        Math.random() * Math.PI * 2,
-        4
-      ));
+    // 简单的随机线条动画
+    const lines = [];
+    const numLines = 20;
+    
+    // 初始化随机线条
+    for (let i = 0; i < numLines; i++) {
+      lines.push({
+        x1: Math.random() * canvas.width,
+        y1: Math.random() * canvas.height,
+        x2: Math.random() * canvas.width,
+        y2: Math.random() * canvas.height,
+        speed: Math.random() * 0.5 + 0.1,
+        angle: Math.random() * Math.PI * 2,
+        opacity: Math.random() * 0.3 + 0.1
+      });
     }
 
     let time = 0;
     // 动画循环
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      neurons.forEach(neuron => neuron.draw(ctx, time));
-      time += 0.016;  // 大约60fps
+      
+      lines.forEach(line => {
+        // 更新线条位置
+        line.x1 += Math.cos(line.angle) * line.speed;
+        line.y1 += Math.sin(line.angle) * line.speed;
+        line.x2 += Math.cos(line.angle + Math.PI/4) * line.speed;
+        line.y2 += Math.sin(line.angle + Math.PI/4) * line.speed;
+        
+        // 边界检查
+        if (line.x1 < 0 || line.x1 > canvas.width || line.y1 < 0 || line.y1 > canvas.height) {
+          line.x1 = Math.random() * canvas.width;
+          line.y1 = Math.random() * canvas.height;
+        }
+        if (line.x2 < 0 || line.x2 > canvas.width || line.y2 < 0 || line.y2 > canvas.height) {
+          line.x2 = Math.random() * canvas.width;
+          line.y2 = Math.random() * canvas.height;
+        }
+        
+        // 绘制线条
+        ctx.beginPath();
+        ctx.moveTo(line.x1, line.y1);
+        ctx.lineTo(line.x2, line.y2);
+        ctx.strokeStyle = `rgba(100, 149, 237, ${line.opacity})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+      
+      time += 0.016;
       animationFrameId = requestAnimationFrame(animate);
     };
     animate();
@@ -107,6 +84,7 @@ const NeuronAnimation = () => {
         left: 0,
         width: '100%',
         height: '100%',
+        pointerEvents: 'none'
       }}
     />
   );

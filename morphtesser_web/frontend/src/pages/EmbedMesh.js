@@ -1,29 +1,32 @@
 import React from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
 import DownloadIcon from '@mui/icons-material/Download';
-import CloseIcon from '@mui/icons-material/Close';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import ModelViewer from '../components/ModelViewer';
 
 // 轻量嵌入式页面：通过 /embed/mesh/:id 渲染 OBJ Mesh
-// 规则：从本地文件夹 Z:\lsh\morphtesser_exp\DataSet\guest 下随机选择一个 OBJ 文件
+// 规则：从本地文件夹 X:\morphtesser_exp\neuromorpho_08\results 下根据ID查找对应的 OBJ 文件
 // 支持通过 ?quality=mc 强制使用 data_mc.obj，否则使用 data_refined.obj
+// 查找路径：X:\morphtesser_exp\neuromorpho_08\results\{前三位}\{id}.swc\data_{quality}.obj
 
 export default function EmbedMesh() {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
-    const navigate = useNavigate();
     const [resolvedUrl, setResolvedUrl] = React.useState(null);
     const [error, setError] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
+    const [showWireframe, setShowWireframe] = React.useState(false);
+    const modelViewerRef = React.useRef(null);
 
-    // 关闭弹窗
-    const handleClose = () => {
-        navigate(-1); // 返回上一页
+    // 切换线框模式
+    const toggleWireframe = () => {
+        setShowWireframe(!showWireframe);
     };
 
     // 下载当前OBJ文件
@@ -58,9 +61,23 @@ export default function EmbedMesh() {
             setError(null);
             const preferred = searchParams.get('quality') === 'mc' ? 'mc' : 'refined';
 
-            // 通过后端代理读取本地文件
-            const proxy = `/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}`;
-            if (!isCancelled) setResolvedUrl(proxy);
+            // 优先尝试DRC文件，找不到时使用OBJ文件
+            const dracoProxy = `/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=drc`;
+            const objProxy = `/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=obj`;
+            
+            try {
+                // 先尝试DRC文件
+                const dracoResponse = await fetch(dracoProxy, { method: 'HEAD' });
+                if (dracoResponse.ok) {
+                    if (!isCancelled) setResolvedUrl(dracoProxy);
+                    return;
+                }
+            } catch (error) {
+                console.log('DRC文件不存在，尝试OBJ文件');
+            }
+            
+            // DRC文件不存在，使用OBJ文件
+            if (!isCancelled) setResolvedUrl(objProxy);
         }
         resolve().finally(() => {
             if (!isCancelled) setLoading(false);
@@ -109,9 +126,29 @@ export default function EmbedMesh() {
                     px: 2,
                     py: 1
                 }}>
-                    <Typography variant="body2" sx={{ color: 'black', fontSize: '0.8rem' }}>
-                        ID: {id}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: 'black', fontSize: '0.8rem' }}>
+                            ID: {id}
+                        </Typography>
+                        <Tooltip title={showWireframe ? "Switch to solid mode" : "Switch to wireframe mode"}>
+                            <IconButton
+                                onClick={toggleWireframe}
+                                size="small"
+                                sx={{
+                                    color: 'black',
+                                    backgroundColor: 'rgba(255,255,255,0.8)',
+                                    border: '1px solid rgba(0,0,0,0.3)',
+                                    width: 32,
+                                    height: 32,
+                                    '&:hover': {
+                                        backgroundColor: 'rgba(255,255,255,0.9)',
+                                    },
+                                }}
+                            >
+                                {showWireframe ? <VisibilityOff sx={{ fontSize: 16 }} /> : <Visibility sx={{ fontSize: 16 }} />}
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         <Button
                             variant="outlined"
@@ -134,21 +171,9 @@ export default function EmbedMesh() {
                                 }
                             }}
                         >
-                            下载
+                            Download
                         </Button>
-                        <IconButton 
-                            size="small" 
-                            onClick={handleClose}
-                            sx={{ 
-                                color: 'black',
-                                p: 0.5,
-                                '&:hover': {
-                                    backgroundColor: 'rgba(0,0,0,0.1)'
-                                }
-                            }}
-                        >
-                            <CloseIcon fontSize="small" />
-                        </IconButton>
+
                     </Box>
                 </Box>
             )}
@@ -157,13 +182,15 @@ export default function EmbedMesh() {
             {resolvedUrl && (
                 <Box sx={{ height: '100%', width: '100%' }}>
                     <ModelViewer
-                        ref={null}
+                        ref={modelViewerRef}
                         width="100%"
                         height="100%"
-                        objUrl={resolvedUrl}
+                        objUrl={resolvedUrl.includes('format=obj') ? resolvedUrl : null}
+                        dracoUrl={resolvedUrl.includes('format=drc') ? resolvedUrl : null}
                         swcUrl={null}
                         viewMode="obj"
-                        backgroundColor={0xffffff} // 白色背景，与在线建模保持一致
+                        wireframeMode={showWireframe}
+                        backgroundColor={0xffffff} // 白色背景
                     />
                 </Box>
             )}

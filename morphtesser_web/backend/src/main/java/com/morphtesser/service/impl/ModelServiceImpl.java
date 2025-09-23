@@ -41,6 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.HashMap;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 @Service
 public class ModelServiceImpl implements ModelService {
@@ -106,6 +108,9 @@ public class ModelServiceImpl implements ModelService {
                 model.setLength((Double) result.get("length"));
                 model.setSurfaceArea((Double) result.get("surfaceArea"));
                 model.setVolume((Double) result.get("volume"));
+                
+                // TODO: 后续可以在这里添加Draco压缩步骤
+                // 目前保持原有的SWC到OBJ转换流程
             }
 
             // 6. 再次保存模型
@@ -293,6 +298,48 @@ public class ModelServiceImpl implements ModelService {
             if (!wroteObj) {
                 throw new RuntimeException("Out of memory: OBJ file was not generated. Modeling failed.");
             }
+            
+            // 启用Draco压缩
+            String dracoFileName = objFileName.replace(".obj", ".drc");
+            String dracoFilePath = Paths.get(userDir, dracoFileName).toString();
+            String dracoHttpPath = "/uploads/draco/" + user.getUsername() + "/" + dracoFileName;
+            
+            try {
+                // 直接调用Python脚本进行Draco压缩
+                String[] cmd = {
+                    "C:\\Users\\15370\\anaconda3\\python.exe", 
+                    "draco_compressor.py",
+                    objFilePath,
+                    dracoFilePath,
+                    "7",  // compression_level
+                    "10"  // quantization_bits
+                };
+                
+                ProcessBuilder pb = new ProcessBuilder(cmd);
+                pb.directory(new File(System.getProperty("user.dir")));
+                Process process = pb.start();
+                
+                // 读取输出
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line;
+                StringBuilder output = new StringBuilder();
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+                
+                int exitCode = process.waitFor();
+                
+                if (exitCode == 0 && new File(dracoFilePath).exists()) {
+                    logger.info("Draco压缩成功: {}", dracoFilePath);
+                } else {
+                    logger.warn("Draco压缩失败，继续使用OBJ文件: {}", output.toString());
+                    dracoHttpPath = null;
+                }
+            } catch (Exception e) {
+                logger.warn("Draco压缩异常: {}", e.getMessage());
+                dracoHttpPath = null;
+            }
+            
             // 关键：数据库字段带上用户名子目录
             String swcHttpPath = "/uploads/swc/" + user.getUsername() + "/" + swcFileName;
             String objHttpPath = "/uploads/obj/" + user.getUsername() + "/" + objFileName;
@@ -309,18 +356,25 @@ public class ModelServiceImpl implements ModelService {
             model.setCreatedAt(new Date());
             model.setFilePath(swcHttpPath);
             model.setObjFilePath(objHttpPath);
+            if (dracoHttpPath != null) {
+                model.setDracoFilePath(dracoHttpPath);
+            }
             model.setBrainRegion("未指定");
             model.setDescription("未填写");
             model.setFileType("swc");
             model.setSpecies("未指定");
             NeuronModel savedModel = modelRepository.save(model);
-            logger.info("在线建模成功: id={}, name={}, user={}, swcHttpPath={}, objHttpPath={}", savedModel.getId(), name, user.getUsername(), swcHttpPath, objHttpPath);
+            logger.info("在线建模成功: id={}, name={}, user={}, swcHttpPath={}, objHttpPath={}, dracoHttpPath={}", 
+                savedModel.getId(), name, user.getUsername(), swcHttpPath, objHttpPath, dracoHttpPath);
             // 返回带objSize的结果
             Map<String, Object> result = new HashMap<>();
             result.put("id", savedModel.getId());
             result.put("name", savedModel.getName());
             result.put("swcUrl", swcHttpPath);
             result.put("objUrl", objHttpPath);
+            if (dracoHttpPath != null) {
+                result.put("dracoUrl", dracoHttpPath);
+            }
             result.put("objSize", objSize);
             result.put("createdAt", savedModel.getCreatedAt());
             return ResponseEntity.ok(result);
@@ -351,5 +405,16 @@ public class ModelServiceImpl implements ModelService {
     private User getUserFromUsername(String username) {
         return userRepository.findByUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+    }
+
+    @Override
+    public Map<String, Object> compressModelToDraco(String objFilePath, int compressionLevel, int quantizationBits) {
+        try {
+            logger.info("压缩模型为Draco格式: {}, level={}, bits={}", objFilePath, compressionLevel, quantizationBits);
+            return pythonService.compressObjToDraco(objFilePath);
+        } catch (Exception e) {
+            logger.error("压缩模型失败", e);
+            return null;
+        }
     }
 } 

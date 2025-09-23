@@ -1,10 +1,13 @@
 import React, { useRef, useEffect, useState, useImperativeHandle } from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, CircularProgress, Typography, IconButton, Tooltip } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
-const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width = '100%', height = '100%', onResetView, onFocusSoma, backgroundColor = 0x000000 }, ref) => {
+const ModelViewer = React.forwardRef(({ objUrl, dracoUrl, swcUrl, viewMode = "both", width = '100%', height = '100%', onResetView, onFocusSoma, backgroundColor = 0x000000, wireframeMode = false }, ref) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -13,6 +16,7 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
   const frameIdRef = useRef(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
+  const [showWireframe, setShowWireframe] = React.useState(false);
   // 记录初始相机参数
   const initialCameraState = useRef({ position: null, target: null });
   const swcGroupRef = React.useRef(null);
@@ -24,10 +28,90 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
     viewModeRef.current = viewMode;
   }, [viewMode]);
 
+  // 监听外部线框模式变化
+  React.useEffect(() => {
+    if (wireframeMode !== showWireframe) {
+      setShowWireframe(wireframeMode);
+      applyWireframeMode(wireframeMode);
+    }
+  }, [wireframeMode]);
+
+  // 应用线框模式
+  const applyWireframeMode = (wireframeState) => {
+    if (sceneRef.current) {
+      // 切换OBJ模型的线框模式
+      const objModel = sceneRef.current.getObjectByName('objModel');
+      if (objModel) {
+        if (objModel.material) {
+          objModel.material.wireframe = wireframeState;
+          // 线框模式时只显示正面，实体模式时显示双面
+          objModel.material.side = wireframeState ? THREE.FrontSide : THREE.DoubleSide;
+        } else if (objModel.children && objModel.children.length > 0) {
+          // 如果是组对象，遍历所有子对象
+          objModel.traverse((child) => {
+            if (child.material) {
+              child.material.wireframe = wireframeState;
+              child.material.side = wireframeState ? THREE.FrontSide : THREE.DoubleSide;
+            }
+          });
+        }
+      }
+      
+      // 切换SWC模型的线框模式
+      const swcModel = sceneRef.current.getObjectByName('swcModel');
+      if (swcModel) {
+        swcModel.traverse((child) => {
+          if (child.material) {
+            child.material.wireframe = wireframeState;
+            child.material.side = wireframeState ? THREE.FrontSide : THREE.DoubleSide;
+          }
+        });
+      }
+    }
+  };
+
+  // 切换线框模式
+  const toggleWireframe = () => {
+    const newWireframeState = !showWireframe;
+    setShowWireframe(newWireframeState);
+    
+    if (sceneRef.current) {
+      // 切换OBJ模型的线框模式
+      const objModel = sceneRef.current.getObjectByName('objModel');
+      if (objModel) {
+        if (objModel.material) {
+          objModel.material.wireframe = newWireframeState;
+          // 线框模式时只显示正面，实体模式时显示双面
+          objModel.material.side = newWireframeState ? THREE.FrontSide : THREE.DoubleSide;
+        } else if (objModel.children && objModel.children.length > 0) {
+          // 如果是组对象，遍历所有子对象
+          objModel.traverse((child) => {
+            if (child.material) {
+              child.material.wireframe = newWireframeState;
+              child.material.side = newWireframeState ? THREE.FrontSide : THREE.DoubleSide;
+            }
+          });
+        }
+      }
+      
+      // 切换SWC模型的线框模式
+      const swcModel = sceneRef.current.getObjectByName('swcModel');
+      if (swcModel) {
+        swcModel.traverse((child) => {
+          if (child.material) {
+            child.material.wireframe = newWireframeState;
+            child.material.side = newWireframeState ? THREE.FrontSide : THREE.DoubleSide;
+          }
+        });
+      }
+    }
+  };
+
   // 暴露方法给父组件
   useImperativeHandle(ref, () => ({
     resetView,
-    focusSoma
+    focusSoma,
+    toggleWireframe
   }), []);
 
   // 只在首次挂载时加载模型
@@ -73,9 +157,14 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
         const renderer = new THREE.WebGLRenderer({ 
           antialias: true,
           alpha: true,
-          preserveDrawingBuffer: false
+          preserveDrawingBuffer: false,
+          physicallyCorrectLights: true, // 启用物理正确光照
+          toneMapping: THREE.ACESFilmicToneMapping, // 使用ACES色调映射
+          toneMappingExposure: 1.0,
         });
         renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+        renderer.shadowMap.enabled = true; // 启用阴影
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 使用软阴影
         mountRef.current.appendChild(renderer.domElement);
         rendererRef.current = renderer;
 
@@ -84,19 +173,40 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
       controls.enableDamping = true;
       controlsRef.current = controls;
 
-      // 添加灯光 - 多方向光照确保背面也能看清
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // 增加环境光强度
+      // 增强光照系统
+      // 环境光 - 提供基础照明
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
       scene.add(ambientLight);
 
-      // 主光源
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-      directionalLight.position.set(1, 1, 1);
+      // 主光源 - 模拟太阳光
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      directionalLight.position.set(5, 5, 5);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 2048;
+      directionalLight.shadow.mapSize.height = 2048;
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 50;
+      directionalLight.shadow.camera.left = -10;
+      directionalLight.shadow.camera.right = 10;
+      directionalLight.shadow.camera.top = 10;
+      directionalLight.shadow.camera.bottom = -10;
       scene.add(directionalLight);
 
-      // 添加背面光源
-      const backLight = new THREE.DirectionalLight(0xffffff, 0.5);
-      backLight.position.set(-1, -1, -1);
-      scene.add(backLight);
+      // 补光 - 从右侧
+      const fillLight = new THREE.DirectionalLight(0x87ceeb, 0.4);
+      fillLight.position.set(-3, 2, 3);
+      scene.add(fillLight);
+
+      // 背光 - 增加轮廓
+      const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+      rimLight.position.set(0, 0, -5);
+      scene.add(rimLight);
+
+      // 点光源 - 增加细节
+      const pointLight = new THREE.PointLight(0xffffff, 0.5, 100);
+      pointLight.position.set(0, 3, 0);
+      pointLight.castShadow = true;
+      scene.add(pointLight);
 
       // // 添加顶部光源
       // const topLight = new THREE.DirectionalLight(0xffffff, 0.3);
@@ -122,11 +232,124 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
     }
     };
 
+    // 加载Draco模型
+    const loadDracoModel = (url) => {
+      const dracoLoader = new DRACOLoader();
+      // 使用CDN上的Draco解码器
+      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+      
+      dracoLoader.load(
+        url,
+        (geometry) => {
+          // 计算法向量以实现平滑渲染
+          geometry.computeVertexNormals();
+          
+          // 启用平滑着色
+          geometry.computeTangents();
+          
+          // 设置平滑组，确保所有面都平滑
+          if (geometry.attributes.normal) {
+            // 重新计算法向量以确保平滑
+            geometry.computeVertexNormals();
+          }
+          
+          // 创建更高级的材质
+          const material = new THREE.MeshPhysicalMaterial({
+            color: 0x4a90e2, // 蓝色调
+            metalness: 0.2,
+            roughness: 0.1, // 降低粗糙度，增加平滑感
+            clearcoat: 0.9,
+            clearcoatRoughness: 0.02, // 降低清漆粗糙度，更平滑
+            reflectivity: 0.8,
+            transparent: false,
+            opacity: 1.0,
+            side: THREE.DoubleSide,
+            // 添加一些发光效果
+            emissive: 0x001122,
+            emissiveIntensity: 0.2,
+            // 增加平滑细节
+            normalScale: new THREE.Vector2(0.2, 0.2), // 降低法向量强度，更平滑
+            // 增加材质的深度感
+            transmission: 0.1,
+            thickness: 0.5,
+            // 启用平滑着色
+            flatShading: false, // 确保使用平滑着色
+          });
+          
+          // 添加材质动画效果
+          const animateMaterial = () => {
+            const time = Date.now() * 0.001;
+            material.emissiveIntensity = 0.1 + Math.sin(time * 0.5) * 0.1;
+            material.clearcoatRoughness = 0.05 + Math.sin(time * 0.3) * 0.02;
+          };
+          
+          // 在渲染循环中添加材质动画
+          const animate = () => {
+            animateMaterial();
+            requestAnimationFrame(animate);
+          };
+          animate();
+          
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.name = 'objModel';
+          mesh.castShadow = true; // 启用阴影投射
+          mesh.receiveShadow = true; // 启用阴影接收
+          objGroupRef.current = mesh;
+          mesh.visible = viewModeRef.current !== "swc";
+          
+          // 移除之前的OBJ模型
+          const existingObj = sceneRef.current.getObjectByName('objModel');
+          if (existingObj) {
+            sceneRef.current.remove(existingObj);
+          }
+          sceneRef.current.add(mesh);
+
+          // 居中模型
+          const box = new THREE.Box3().setFromObject(mesh);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+          
+          if (Math.abs(center.x) > 0.1 || Math.abs(center.y) > 0.1 || Math.abs(center.z) > 0.1) {
+            mesh.position.sub(center);
+          }
+
+          // 自适应相机参数
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const fov = cameraRef.current.fov * (Math.PI / 180);
+          let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+          cameraZ *= 1.2;
+          
+          cameraRef.current.position.set(0, 0, cameraZ);
+          cameraRef.current.near = maxDim / 100;
+          cameraRef.current.far = maxDim * 10;
+          cameraRef.current.updateProjectionMatrix();
+          controlsRef.current.target.set(0, 0, 0);
+          controlsRef.current.update();
+          
+          // 保存初始相机状态
+          initialCameraState.current = {
+            position: cameraRef.current.position.clone(),
+            target: controlsRef.current.target.clone()
+          };
+          
+          setLoading(false);
+        },
+        (progress) => {
+          console.log('Draco加载进度:', (progress.loaded / progress.total * 100).toFixed(2) + '%');
+        },
+        (error) => {
+          console.error('Draco加载失败:', error);
+          setError('Draco模型加载失败');
+          setLoading(false);
+        }
+      );
+    };
+
     // 加载OBJ模型
-    if (objUrl) {
+    const loadOBJModel = (url) => {
       const loader = new OBJLoader();
       loader.load(
-        objUrl,
+        url,
         (object) => {
           // 设置OBJ材质为半透明、颜色随机
           const randomColor = () => {
@@ -138,6 +361,8 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
               // 计算法向量以实现平滑渲染
               if (child.geometry) {
                 child.geometry.computeVertexNormals();
+                // 启用平滑着色
+                child.geometry.computeTangents();
               }
               child.material = new THREE.MeshPhongMaterial({
                 color: randomColor(),
@@ -351,6 +576,19 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
           setError('加载SWC文件失败');
           setLoading(false);
         });
+    }
+    
+    // 根据文件类型选择加载方式
+    if (dracoUrl) {
+      // 优先加载Draco文件
+      loadDracoModel(dracoUrl);
+    } else if (objUrl) {
+      // 检查是否为Draco文件
+      if (objUrl.toLowerCase().endsWith('.drc') || objUrl.includes('draco')) {
+        loadDracoModel(objUrl);
+      } else {
+        loadOBJModel(objUrl);
+      }
     }
     
     // 根据神经元类型获取颜色
@@ -652,6 +890,7 @@ const ModelViewer = React.forwardRef(({ objUrl, swcUrl, viewMode = "both", width
         </Box>
       )}
       <Box ref={mountRef} sx={{ width: '100%', height: '100%' }} />
+      
     </Box>
   );
 });

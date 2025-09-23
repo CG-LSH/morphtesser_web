@@ -31,6 +31,7 @@ com\morphtesser\security\AuthEntryPointJwt.class
 com\morphtesser\service\impl\UserServiceImpl.class
 com\morphtesser\config\TestDataInitializer.class
 com\morphtesser\controller\ModelController.class
+com\morphtesser\service\impl\PythonServiceImpl$2.class
 com\morphtesser\service\impl\PythonServiceImpl.class
 com\morphtesser\service\ModelPreviewService.class
 com\morphtesser\model\ModelMetadata.class

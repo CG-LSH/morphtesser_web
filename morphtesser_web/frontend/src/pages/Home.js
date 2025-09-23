@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Box, Container, Typography, Button, Grid, Card, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, TextField, FormControlLabel, RadioGroup, Radio } from '@mui/material';
+import { Box, Container, Typography, Button, AppBar, Toolbar, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, TextField, FormControlLabel, RadioGroup, Radio } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import NeuronBackground from '../assets/images/neuron-bg';
-
-
-
 import BuildIcon from '@mui/icons-material/Build';
 import StorageIcon from '@mui/icons-material/Storage';
+import ExtensionIcon from '@mui/icons-material/Extension';
 import axios from 'axios';
 import modelService from '../services/model.service';
 import NeuronAnimation from '../components/NeuronAnimation';
@@ -57,10 +55,9 @@ const Home = () => {
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      backgroundImage: neuronBg,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      width: '100vw',
       position: 'relative',
+      overflow: 'auto',
       '&::before': {
         content: '""',
         position: 'absolute',
@@ -68,12 +65,250 @@ const Home = () => {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backgroundColor: 'rgba(0, 0, 0, 0.2)',
         zIndex: 1
       }
     }}>
-      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2, py: 8 }}>
-        <Box sx={{ textAlign: 'center', mb: 6 }}>
+      {/* Navigation Bar */}
+      <AppBar position="static" sx={{ 
+        background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.8) 50%, rgba(0, 0, 0, 0.6) 100%)',
+        backdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+        zIndex: 100,
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        width: '100vw',
+        margin: 0,
+        padding: 0,
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          bottom: '-20px',
+          left: 0,
+          right: 0,
+          height: '20px',
+          background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%)',
+          pointerEvents: 'none',
+          zIndex: -1
+        },
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          bottom: '-40px',
+          left: 0,
+          right: 0,
+          height: '40px',
+          background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.1) 50%, transparent 100%)',
+          pointerEvents: 'none',
+          zIndex: -2
+        }
+      }}>
+        <Toolbar sx={{ 
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
+          justifyContent: 'space-between',
+          minHeight: { xs: '64px', sm: '64px' },
+          paddingLeft: { xs: '12px', sm: '16px', md: '24px' },
+          paddingRight: { xs: '12px', sm: '16px', md: '24px' },
+          margin: 0,
+          width: '100%',
+          maxWidth: 'none'
+        }}>
+          {/* Left MorphTesser Logo */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            flexGrow: { xs: 1, sm: 0 },
+            minWidth: { xs: 'auto', sm: '200px' },
+            transition: 'all 0.3s ease',
+            '&:hover': {
+              transform: 'scale(1.05)'
+            }
+          }}>
+            <img 
+              src="/assets/images/logo_M.png" 
+              alt="MorphTesser Logo" 
+              style={{ 
+                height: '40px', 
+                width: 'auto',
+                maxWidth: '100%',
+                filter: 'drop-shadow(0 2px 8px rgba(255, 255, 255, 0.1))'
+              }} 
+            />
+          </Box>
+          
+          {/* Right Navigation Buttons */}
+          <Box sx={{ 
+            display: 'flex', 
+            gap: { xs: 1, sm: 2 },
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            justifyContent: { xs: 'center', sm: 'flex-end' },
+            width: { xs: '100%', sm: 'auto' },
+            mt: { xs: 1, sm: 0 }
+          }}>
+            <Button
+              color="inherit"
+              startIcon={<BuildIcon />}
+              onClick={() => {
+                console.log('Online Modeling clicked');
+                navigate('/online-builder');
+              }}
+              sx={{ 
+                color: 'white',
+                position: 'relative',
+                zIndex: 101,
+                pointerEvents: 'auto',
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                minWidth: { xs: 'auto', sm: 'auto' },
+                px: { xs: 1.5, sm: 2.5 },
+                py: { xs: 1, sm: 1.5 },
+                borderRadius: '8px',
+                fontWeight: 500,
+                textTransform: 'none',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
+                },
+                '&:active': {
+                  transform: 'translateY(0px)'
+                }
+              }}
+            >
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Online Modeling
+              </Box>
+              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                Modeling
+              </Box>
+            </Button>
+            <Button
+              color="inherit"
+              startIcon={<StorageIcon />}
+              onClick={() => {
+                console.log('Data Repository clicked');
+                navigate('/public-database');
+              }}
+              sx={{ 
+                color: 'white',
+                position: 'relative',
+                zIndex: 101,
+                pointerEvents: 'auto',
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                minWidth: { xs: 'auto', sm: 'auto' },
+                px: { xs: 1.5, sm: 2.5 },
+                py: { xs: 1, sm: 1.5 },
+                borderRadius: '8px',
+                fontWeight: 500,
+                textTransform: 'none',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
+                },
+                '&:active': {
+                  transform: 'translateY(0px)'
+                }
+              }}
+            >
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Data Repository
+              </Box>
+              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                Repository
+              </Box>
+            </Button>
+            <Button
+              color="inherit"
+              startIcon={<ExtensionIcon />}
+              onClick={() => {
+                console.log('NeuroMorpho Plugin clicked');
+                navigate('/neuromorpho-plugin');
+              }}
+              sx={{ 
+                color: 'white',
+                position: 'relative',
+                zIndex: 101,
+                pointerEvents: 'auto',
+                fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                minWidth: { xs: 'auto', sm: 'auto' },
+                px: { xs: 1.5, sm: 2.5 },
+                py: { xs: 1, sm: 1.5 },
+                borderRadius: '8px',
+                fontWeight: 500,
+                textTransform: 'none',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
+                },
+                '&:active': {
+                  transform: 'translateY(0px)'
+                }
+              }}
+            >
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                NeuroMorpho.Org Plugin
+              </Box>
+              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                Plugin
+              </Box>
+            </Button>
+          </Box>
+        </Toolbar>
+      </AppBar>
+
+      {/* Full Page Line Animation */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1,
+          opacity: 0.3,
+          overflow: 'hidden',
+          pointerEvents: 'none'
+        }}
+      >
+        <NeuronAnimation />
+      </Box>
+
+      <Box sx={{ 
+        position: 'relative', 
+        zIndex: 3, 
+        width: '100vw',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        px: 0,
+        mx: 0,
+        pt: '84px',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '60px',
+          background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.2) 50%, transparent 100%)',
+          pointerEvents: 'none',
+          zIndex: -1
+        }
+      }}>
+        <Container maxWidth={false} sx={{ 
+          textAlign: 'center',
+          py: { xs: 4, sm: 6, md: 8 },
+          px: { xs: 2, sm: 3, md: 4 }
+        }}>
           <Typography 
             variant="h2" 
             component="h1" 
@@ -84,7 +319,9 @@ const Home = () => {
               textShadow: '0 0 10px rgba(62, 118, 244, 0.8), 0 0 20px rgba(62, 118, 244, 0.5)',
               fontFamily: '"Orbitron", "Roboto", sans-serif',
               letterSpacing: '0.02em',
-              marginBottom: 3,
+              marginBottom: { xs: 1.5, sm: 2, md: 2.5 },
+              fontSize: { xs: '2.5rem', sm: '4rem', md: '5rem', lg: '6rem', xl: '7rem' },
+              textAlign: 'center',
               position: 'relative',
               '&::after': {
                 content: '""',
@@ -98,7 +335,7 @@ const Home = () => {
               }
             }}
           >
-            3D Neuron Modeling and Morphological Analysis System
+            MorphTesser
           </Typography>
           <Typography 
             variant="h5" 
@@ -109,129 +346,28 @@ const Home = () => {
               fontWeight: 300,
               letterSpacing: '0.05em',
               fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-              marginBottom: 4,
-              fontSize: '1.3rem',
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
+              marginBottom: { xs: 2, sm: 2.5, md: 3 },
+              fontSize: { xs: '1.1rem', sm: '1.4rem', md: '1.7rem', lg: '2rem', xl: '2.2rem' },
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+              textAlign: 'center',
+              px: { xs: 1, sm: 0 }
             }}
           >
-            Efficiently model and analyze neuron morphology, explore the mysteries of the brain
+            Efficient neuron morphological modeling and analysis platform, exploring the mysteries of the brain
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mb: 6 }}>
-            <Button
-              variant="outlined"
-              color="primary"
-              size="large"
-              onClick={() => navigate('/online-builder')}
-              sx={{
-                backgroundColor: 'rgba(156, 39, 176, 0.25)',
-                border: '2px solid rgba(255, 255, 255, 0.4)',
-                color: 'white',
-                zIndex: 2,
-                minWidth: '200px',
-                '&:hover': {
-                  backgroundColor: 'rgba(156, 39, 176, 0.35)',
-                  border: '2px solid rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 0 10px rgba(255, 255, 255, 0.2)'
-                }
-              }}
-            >
-              Online Modeling
-            </Button>
-            <Button 
-              variant="outlined" 
-              color="primary" 
-              size="large"
-              onClick={() => navigate('/public-database')}
-              sx={{
-                backgroundColor: 'rgba(0, 200, 83, 0.25)',
-                border: '2px solid rgba(255, 255, 255, 0.4)',
-                color: 'white',
-                zIndex: 2,
-                minWidth: '200px',
-                '&:hover': {
-                  backgroundColor: 'rgba(0, 200, 83, 0.35)',
-                  border: '2px solid rgba(255, 255, 255, 0.8)',
-                  boxShadow: '0 0 10px rgba(255, 255, 255, 0.2)'
-                }
-              }}
-            >
-              Public Database
-            </Button>
-          </Box>
-        </Box>
+        </Container>
 
-        <Grid container spacing={4} justifyContent="center">
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 0,
-              opacity: 0.1,
-              overflow: 'hidden'
-            }}
-          >
-            <NeuronAnimation />
-          </Box>
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <CardContent sx={{ flexGrow: 1 }}>
-                <BuildIcon sx={{ fontSize: 48, mb: 2 }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Online Modeling
-                </Typography>
-                <Typography>
-                  Use our online modeling tool to create a fine-grained 3D neuron model from SWC or OBJ files, and save it to your model library.
-                </Typography>
-              </CardContent>
-              <Box sx={{ p: 2 }}>
-                <Button 
-                  variant="contained" 
-                  fullWidth
-                  onClick={() => navigate('/online-builder')}
-                >
-                  Start Modeling
-                </Button>
-              </Box>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <CardContent sx={{ flexGrow: 1 }}>
-                <StorageIcon sx={{ fontSize: 48, mb: 2 }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Public Database
-                </Typography>
-                <Typography>
-                  Browse the public neuron database, containing SWC and OBJ models of various species and brain regions, which can be downloaded and visualized.
-                </Typography>
-              </CardContent>
-              <Box sx={{ p: 2 }}>
-                <Button 
-                  variant="contained" 
-                  fullWidth
-                  onClick={() => navigate('/public-database')}
-                >
-                  Public Database
-                </Button>
-              </Box>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* 底部红色区域加背景图 */}
+        {/* Full Page Background Image */}
         <Box
           sx={{
-            position: 'absolute',
+            position: 'fixed',
+            top: '64px',
             left: 0,
             right: 0,
-            bottom: -735,
-            height: '59vh',
-            zIndex: 1,
-            background: `url('/assets/images/neuron-bg.png') center bottom/cover no-repeat`,
-            opacity: 0.3,
+            bottom: 0,
+            zIndex: -1,
+            background: `url('/assets/images/neuron-bg.png') center center/cover no-repeat`,
+            opacity: 0.8,
             pointerEvents: 'none',
           }}
         />
@@ -311,9 +447,9 @@ const Home = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </Container>
+      </Box>
     </Box>
   );
 };
 
-export default Home; 
+export default Home;

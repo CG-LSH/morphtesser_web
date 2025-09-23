@@ -33,7 +33,7 @@ public class MorphtesserApplication {
                     Paths.get("./scripts/sphere.obj"),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING
                 );
-                System.out.println("已复制球体模型到scripts目录");
+
             }
             
             // 复制Python脚本到scripts目录
@@ -81,7 +81,7 @@ public class MorphtesserApplication {
                     writer.println("if __name__ == \"__main__\":");
                     writer.println("    sys.exit(main())");
                 }
-                System.out.println("已创建Python脚本");
+
             }
             
         } catch (Exception e) {

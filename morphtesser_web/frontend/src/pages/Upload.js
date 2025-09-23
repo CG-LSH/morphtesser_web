@@ -120,9 +120,6 @@ const UploadPage = () => {
     <AuthCheck>
       <Box sx={{ 
         minHeight: '100vh',
-        backgroundImage: neuronBg,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
         position: 'relative',
         py: 4,
         '&::before': {

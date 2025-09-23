@@ -28,7 +28,7 @@ public class TestDataInitializer {
                 testUser.setPassword(passwordEncoder.encode("password"));
                 userRepository.save(testUser);
                 
-                System.out.println("已创建测试用户: test / password");
+        
             }
         };
     }

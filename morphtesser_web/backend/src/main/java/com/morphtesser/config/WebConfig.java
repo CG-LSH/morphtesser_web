@@ -25,6 +25,9 @@ public class WebConfig implements WebMvcConfigurer {
         // OBJ 文件映射
         registry.addResourceHandler("/uploads/obj/**")
                 .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/");
+        // Draco 文件映射
+        registry.addResourceHandler("/uploads/draco/**")
+                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/");
     }
 
     @Override

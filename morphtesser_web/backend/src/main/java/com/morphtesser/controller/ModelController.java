@@ -37,6 +37,7 @@ import com.morphtesser.security.JwtUtils;
 import com.morphtesser.repository.UserRepository;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import java.util.ArrayList;
+import org.springframework.core.io.UrlResource;
 
 @RestController
 @RequestMapping("/api/models")
@@ -44,6 +45,9 @@ import java.util.ArrayList;
 public class ModelController {
 
     private static final Logger logger = LoggerFactory.getLogger(ModelController.class);
+    
+    // 根目录写死
+    private static final String BASE_DIR = "Z:/lsh/morphtesser_exp/DataSet/";
 
     @Autowired
     private ModelService modelService;
@@ -149,21 +153,54 @@ public class ModelController {
     public ResponseEntity<Resource> getModelFile(
             @PathVariable Long id,
             @PathVariable String type,
-            @RequestHeader("Authorization") String token) {
+            @RequestParam("token") String token) {
         
         logger.info("获取模型文件: id={}, type={}", id, type);
         
-        ResponseEntity<Resource> response = modelService.getModelFile(id, type, token);
-        
-        if (response.getBody() != null) {
-            String contentType = type.equals("obj") ? "application/octet-stream" : "text/plain";
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + id + "." + type + "\"")
-                    .body(response.getBody());
+        String username = getUsernameFromToken("Bearer " + token);
+        if (username == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         
-        return response;
+        NeuronModel model = modelRepository.findById(id).orElse(null);
+        if (model == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!model.getUser().getUsername().equals(username)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        
+        try {
+            String relPath;
+            if ("obj".equals(type)) {
+                relPath = model.getObjFilePath();
+            } else if ("swc".equals(type)) {
+                relPath = model.getFilePath();
+            } else if ("draco".equals(type)) {
+                relPath = model.getDracoFilePath();
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            if (relPath == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Path filePath = Paths.get(BASE_DIR, relPath);
+            Resource resource = new FileSystemResource(filePath.toFile());
+            
+            if (resource.exists() && resource.isReadable()) {
+                return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filePath.getFileName() + "\"")
+                    .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+            
+        } catch (Exception e) {
+            logger.error("获取模型文件失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     @GetMapping("/{id}/download/{type}")
@@ -177,7 +214,15 @@ public class ModelController {
         ResponseEntity<Resource> response = modelService.getModelFile(id, type, token);
         
         if (response.getBody() != null) {
-            String contentType = type.equals("obj") ? "application/octet-stream" : "text/plain";
+            String contentType;
+            if ("obj".equals(type)) {
+                contentType = "application/octet-stream";
+            } else if ("draco".equals(type)) {
+                contentType = "application/octet-stream";
+            } else {
+                contentType = "text/plain";
+            }
+            
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + "." + type + "\"")
@@ -278,6 +323,57 @@ public class ModelController {
         return modelService.createModelFromOnlineBuilder(name, type, token, swcFile);
     }
 
+    @PostMapping("/{id}/compress-draco")
+    public ResponseEntity<?> compressModelToDraco(
+            @PathVariable Long id,
+            @RequestHeader("Authorization") String token,
+            @RequestParam(value = "compression_level", defaultValue = "7") int compressionLevel,
+            @RequestParam(value = "quantization_bits", defaultValue = "10") int quantizationBits) {
+        
+        logger.info("压缩模型为Draco格式: id={}, level={}, bits={}", id, compressionLevel, quantizationBits);
+        
+        try {
+            // 获取模型
+            ResponseEntity<NeuronModel> modelResponse = modelService.getModelById(id, token);
+            if (modelResponse.getStatusCode().isError() || modelResponse.getBody() == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            NeuronModel model = modelResponse.getBody();
+            if (model.getObjFilePath() == null) {
+                return ResponseEntity.badRequest().body("模型没有OBJ文件，无法压缩");
+            }
+            
+            // 调用Python服务进行压缩
+            String objAbsPath = BASE_DIR + model.getObjFilePath();
+            Map<String, Object> dracoResult = modelService.compressModelToDraco(objAbsPath, compressionLevel, quantizationBits);
+            
+            if (dracoResult != null && dracoResult.containsKey("success") && (Boolean) dracoResult.get("success")) {
+                String dracoAbsPath = (String) dracoResult.get("output_path");
+                String dracoRelPath = dracoAbsPath.replace(BASE_DIR, "");
+                model.setDracoFilePath(dracoRelPath);
+                model.setCompressionRatio((Double) dracoResult.get("compression_ratio"));
+                modelRepository.save(model);
+                
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Draco压缩成功",
+                    "compression_ratio", dracoResult.get("compression_ratio"),
+                    "original_size", dracoResult.get("original_size"),
+                    "compressed_size", dracoResult.get("compressed_size")
+                ));
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "message", "Draco压缩失败"));
+            }
+            
+        } catch (Exception e) {
+            logger.error("压缩模型失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("success", false, "message", "压缩失败: " + e.getMessage()));
+        }
+    }
+
     @GetMapping("/public-files")
     public List<Map<String, Object>> listPublicFiles() {
         File dir = new File("Z:/lsh/morphtesser_exp/DataSet/LSH/");
@@ -311,6 +407,36 @@ public class ModelController {
                 return dto;
             })
             .collect(Collectors.toList());
+    }
+
+    @GetMapping("/{id}/file/draco")
+    public ResponseEntity<Resource> getDracoFile(@PathVariable Long id) {
+        try {
+            NeuronModel model = modelRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Model not found"));
+            
+            if (model.getDracoFilePath() == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            // 构建本地文件路径
+            String localPath = BASE_DIR + model.getDracoFilePath().replace("/uploads/draco/", "");
+            File file = new File(localPath);
+            
+            if (!file.exists()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Path path = file.toPath();
+            Resource resource = new UrlResource(path.toUri());
+            
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.getName() + "\"")
+                .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream")
+                .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     private String getUsernameFromToken(String token) {

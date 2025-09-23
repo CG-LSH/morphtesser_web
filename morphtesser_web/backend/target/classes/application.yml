@@ -7,6 +7,6 @@ smb:
   root: morphtesser_exp/neuromorpho_08
 python:
   service:
-    url: http://localhost:5000
+    url: http://localhost:8001
   script-path: scripts/swc_to_obj.py
   executable: python 
