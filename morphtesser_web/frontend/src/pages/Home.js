@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Container, Typography, Button, AppBar, Toolbar, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, TextField, FormControlLabel, RadioGroup, Radio } from '@mui/material';
+import { Box, Container, Typography, Button, AppBar, Toolbar, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, TextField, FormControlLabel, RadioGroup, Radio, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import NeuronBackground from '../assets/images/neuron-bg';
 import BuildIcon from '@mui/icons-material/Build';
@@ -55,7 +55,7 @@ const Home = () => {
   return (
     <Box sx={{ 
       minHeight: '100vh',
-      width: '100vw',
+      width: '100%',
       position: 'relative',
       overflow: 'auto',
       '&::before': {
@@ -80,7 +80,7 @@ const Home = () => {
         top: 0,
         left: 0,
         right: 0,
-        width: '100vw',
+        width: '100%',
         margin: 0,
         padding: 0,
         '&::before': {
@@ -117,27 +117,34 @@ const Home = () => {
           maxWidth: 'none'
         }}>
           {/* Left MorphTesser Logo */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            flexGrow: { xs: 1, sm: 0 },
-            minWidth: { xs: 'auto', sm: '200px' },
-            transition: 'all 0.3s ease',
-            '&:hover': {
-              transform: 'scale(1.05)'
-            }
-          }}>
-            <img 
-              src="/assets/images/logo_M.png" 
-              alt="MorphTesser Logo" 
-              style={{ 
-                height: '40px', 
-                width: 'auto',
-                maxWidth: '100%',
-                filter: 'drop-shadow(0 2px 8px rgba(255, 255, 255, 0.1))'
-              }} 
-            />
-          </Box>
+          <Tooltip title="MorphTesser - 3D Neuron Modeling Platform" arrow>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              flexGrow: { xs: 1, sm: 0 },
+              minWidth: { xs: 'auto', sm: '200px' },
+              transition: 'all 0.3s ease',
+              cursor: 'pointer',
+              '&:hover': {
+                transform: 'scale(1.05)'
+              }
+            }}
+              onClick={() => navigate('/')}
+              role="button"
+              aria-label="Go Home"
+            >
+              <img 
+                src="/assets/images/logo_M.png" 
+                alt="MorphTesser Logo" 
+                style={{ 
+                  height: '40px', 
+                  width: 'auto',
+                  maxWidth: '100%',
+                  filter: 'drop-shadow(0 2px 8px rgba(255, 255, 255, 0.1))'
+                }} 
+              />
+            </Box>
+          </Tooltip>
           
           {/* Right Navigation Buttons */}
           <Box sx={{ 
@@ -148,117 +155,123 @@ const Home = () => {
             width: { xs: '100%', sm: 'auto' },
             mt: { xs: 1, sm: 0 }
           }}>
-            <Button
-              color="inherit"
-              startIcon={<BuildIcon />}
-              onClick={() => {
-                console.log('Online Modeling clicked');
-                navigate('/online-builder');
-              }}
-              sx={{ 
-                color: 'white',
-                position: 'relative',
-                zIndex: 101,
-                pointerEvents: 'auto',
-                fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                minWidth: { xs: 'auto', sm: 'auto' },
-                px: { xs: 1.5, sm: 2.5 },
-                py: { xs: 1, sm: 1.5 },
-                borderRadius: '8px',
-                fontWeight: 500,
-                textTransform: 'none',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
-                },
-                '&:active': {
-                  transform: 'translateY(0px)'
-                }
-              }}
-            >
-              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                Online Modeling
-              </Box>
-              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                Modeling
-              </Box>
-            </Button>
-            <Button
-              color="inherit"
-              startIcon={<StorageIcon />}
-              onClick={() => {
-                console.log('Data Repository clicked');
-                navigate('/public-database');
-              }}
-              sx={{ 
-                color: 'white',
-                position: 'relative',
-                zIndex: 101,
-                pointerEvents: 'auto',
-                fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                minWidth: { xs: 'auto', sm: 'auto' },
-                px: { xs: 1.5, sm: 2.5 },
-                py: { xs: 1, sm: 1.5 },
-                borderRadius: '8px',
-                fontWeight: 500,
-                textTransform: 'none',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
-                },
-                '&:active': {
-                  transform: 'translateY(0px)'
-                }
-              }}
-            >
-              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                Data Repository
-              </Box>
-              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                Repository
-              </Box>
-            </Button>
-            <Button
-              color="inherit"
-              startIcon={<ExtensionIcon />}
-              onClick={() => {
-                console.log('NeuroMorpho Plugin clicked');
-                navigate('/neuromorpho-plugin');
-              }}
-              sx={{ 
-                color: 'white',
-                position: 'relative',
-                zIndex: 101,
-                pointerEvents: 'auto',
-                fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                minWidth: { xs: 'auto', sm: 'auto' },
-                px: { xs: 1.5, sm: 2.5 },
-                py: { xs: 1, sm: 1.5 },
-                borderRadius: '8px',
-                fontWeight: 500,
-                textTransform: 'none',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
-                },
-                '&:active': {
-                  transform: 'translateY(0px)'
-                }
-              }}
-            >
-              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
-                NeuroMorpho.Org Plugin
-              </Box>
-              <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
-                Plugin
-              </Box>
-            </Button>
+            <Tooltip title="Create and customize 3D neuron models with our online modeling tools" arrow>
+              <Button
+                color="inherit"
+                startIcon={<BuildIcon />}
+                onClick={() => {
+                  console.log('Online Modeling clicked');
+                  navigate('/online-builder');
+                }}
+                sx={{ 
+                  color: 'white',
+                  position: 'relative',
+                  zIndex: 101,
+                  pointerEvents: 'auto',
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  px: { xs: 1.5, sm: 2.5 },
+                  py: { xs: 1, sm: 1.5 },
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
+                  },
+                  '&:active': {
+                    transform: 'translateY(0px)'
+                  }
+                }}
+              >
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Online Modeling
+                </Box>
+                <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                  Modeling
+                </Box>
+              </Button>
+            </Tooltip>
+            <Tooltip title="Browse and download 3D neuron models from our public database" arrow>
+              <Button
+                color="inherit"
+                startIcon={<StorageIcon />}
+                onClick={() => {
+                  console.log('Data Repository clicked');
+                  navigate('/public-database');
+                }}
+                sx={{ 
+                  color: 'white',
+                  position: 'relative',
+                  zIndex: 101,
+                  pointerEvents: 'auto',
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  px: { xs: 1.5, sm: 2.5 },
+                  py: { xs: 1, sm: 1.5 },
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
+                  },
+                  '&:active': {
+                    transform: 'translateY(0px)'
+                  }
+                }}
+              >
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Data Repository
+                </Box>
+                <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                  Repository
+                </Box>
+              </Button>
+            </Tooltip>
+            <Tooltip title="Learn about our NeuroMorpho.Org browser extension for seamless 3D model integration" arrow>
+              <Button
+                color="inherit"
+                startIcon={<ExtensionIcon />}
+                onClick={() => {
+                  console.log('NeuroMorpho Plugin clicked');
+                  navigate('/neuromorpho-plugin');
+                }}
+                sx={{ 
+                  color: 'white',
+                  position: 'relative',
+                  zIndex: 101,
+                  pointerEvents: 'auto',
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  px: { xs: 1.5, sm: 2.5 },
+                  py: { xs: 1, sm: 1.5 },
+                  borderRadius: '8px',
+                  fontWeight: 500,
+                  textTransform: 'none',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(255, 255, 255, 0.1)'
+                  },
+                  '&:active': {
+                    transform: 'translateY(0px)'
+                  }
+                }}
+              >
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  NeuroMorpho.Org Plugin
+                </Box>
+                <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                  Plugin
+                </Box>
+              </Button>
+            </Tooltip>
           </Box>
         </Toolbar>
       </AppBar>
@@ -283,7 +296,7 @@ const Home = () => {
       <Box sx={{ 
         position: 'relative', 
         zIndex: 3, 
-        width: '100vw',
+        width: '100%',
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
@@ -304,10 +317,11 @@ const Home = () => {
           zIndex: -1
         }
       }}>
-        <Container maxWidth={false} sx={{ 
+        <Container maxWidth="lg" sx={{ 
           textAlign: 'center',
           py: { xs: 4, sm: 6, md: 8 },
-          px: { xs: 2, sm: 3, md: 4 }
+          px: { xs: 2, sm: 3, md: 4 },
+          mx: 'auto'
         }}>
           <Typography 
             variant="h2" 
@@ -317,7 +331,7 @@ const Home = () => {
               color: 'white',
               fontWeight: 700,
               textShadow: '0 0 10px rgba(62, 118, 244, 0.8), 0 0 20px rgba(62, 118, 244, 0.5)',
-              fontFamily: '"Orbitron", "Roboto", sans-serif',
+              fontFamily: '"Orbitron", "Arial Black", "Arial", sans-serif',
               letterSpacing: '0.02em',
               marginBottom: { xs: 1.5, sm: 2, md: 2.5 },
               fontSize: { xs: '2.5rem', sm: '4rem', md: '5rem', lg: '6rem', xl: '7rem' },
@@ -337,24 +351,113 @@ const Home = () => {
           >
             MorphTesser
           </Typography>
-          <Typography 
-            variant="h5" 
-            gutterBottom
-            sx={{
-              color: 'white',
-              opacity: 0.8,
-              fontWeight: 300,
-              letterSpacing: '0.05em',
-              fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-              marginBottom: { xs: 2, sm: 2.5, md: 3 },
-              fontSize: { xs: '1.1rem', sm: '1.4rem', md: '1.7rem', lg: '2rem', xl: '2.2rem' },
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-              textAlign: 'center',
-              px: { xs: 1, sm: 0 }
-            }}
-          >
-            Efficient neuron morphological modeling and analysis platform, exploring the mysteries of the brain
-          </Typography>
+          <Box sx={{ 
+            maxWidth: { xs: '100%', sm: '98%', md: '95%', lg: '92%' },
+            mx: 'auto',
+            mb: { xs: 3, sm: 4, md: 5 }
+          }}>
+            <Typography 
+              variant="h5" 
+              gutterBottom
+              sx={{
+                color: 'white',
+                opacity: 0.9,
+                fontWeight: 400,
+                letterSpacing: '0.02em',
+                lineHeight: 1.7,
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                marginBottom: { xs: 2, sm: 2.5, md: 3 },
+                fontSize: { xs: '1.3rem', sm: '1.6rem', md: '1.8rem', lg: '2rem' },
+                textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
+                textAlign: 'center',
+                px: { xs: 2, sm: 3, md: 4 }
+              }}
+            >
+              A cutting-edge platform for efficient neuron morphological modeling, featuring high-quality online modeling capabilities.
+            </Typography>
+            
+            <Box sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: { xs: 1.5, sm: 2, md: 2.5 },
+              mt: { xs: 3, sm: 4, md: 5 },
+              maxWidth: { xs: '100%', sm: '65%', md: '60%', lg: '55%' },
+              mx: 'auto'
+            }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontSize: { xs: '2.3rem', sm: '2.5rem', md: '2.7rem', lg: '2.9rem' },
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 300,
+                textShadow: '0 1px 4px rgba(0, 0, 0, 0.4)'
+              }}>
+                <Box sx={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '3px',
+                  backgroundColor: 'rgba(255, 255, 255, 1)',
+                  flexShrink: 0,
+                  boxShadow: '0 0 12px rgba(62, 118, 244, 0.8), 0 0 24px rgba(62, 118, 244, 0.4)',
+                  mt: { xs: '0rem', sm: '0.1rem', md: '0.2rem', lg: '0.3rem' }
+                }} />
+                <Typography component="span">
+                  Advanced <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>online modeling</strong> capabilities with <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>high-efficiency algorithms</strong> for precise neuron reconstruction
+                </Typography>
+              </Box>
+              
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontSize: { xs: '2.3rem', sm: '2.5rem', md: '2.7rem', lg: '2.9rem' },
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 300,
+                textShadow: '0 1px 4px rgba(0, 0, 0, 0.4)'
+              }}>
+                <Box sx={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '3px',
+                  backgroundColor: 'rgba(255, 255, 255, 1)',
+                  flexShrink: 0,
+                  boxShadow: '0 0 12px rgba(62, 118, 244, 0.8), 0 0 24px rgba(62, 118, 244, 0.4)',
+                  mt: { xs: '0rem', sm: '0.1rem', md: '0.2rem', lg: '0.3rem' }
+                }} />
+                <Typography component="span">
+                  Comprehensive <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>public database</strong> featuring <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>whole-brain</strong> <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>neurons</strong> models from diverse research institutions worldwide
+                </Typography>
+              </Box>
+              
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1,
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontSize: { xs: '2.3rem', sm: '2.5rem', md: '2.7rem', lg: '2.9rem' },
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                fontWeight: 300,
+                textShadow: '0 1px 4px rgba(0, 0, 0, 0.4)'
+              }}>
+                <Box sx={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '3px',
+                  backgroundColor: 'rgba(255, 255, 255, 1)',
+                  flexShrink: 0,
+                  boxShadow: '0 0 12px rgba(62, 118, 244, 0.8), 0 0 24px rgba(62, 118, 244, 0.4)',
+                  mt: { xs: '0rem', sm: '0.1rem', md: '0.2rem', lg: '0.3rem' }
+                }} />
+                <Typography component="span">
+                  Seamless <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>NeuroMorpho.Org</strong> <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>website</strong> <strong style={{ textShadow: '0 0 8px rgba(62, 118, 244, 0.8)' }}>plugin</strong> integration for convenient access and enhanced research workflow
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
         </Container>
 
         {/* Full Page Background Image */}
@@ -367,6 +470,9 @@ const Home = () => {
             bottom: 0,
             zIndex: -1,
             background: `url('/assets/images/neuron-bg.png') center center/cover no-repeat`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
             opacity: 0.8,
             pointerEvents: 'none',
           }}

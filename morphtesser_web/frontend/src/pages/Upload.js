@@ -121,7 +121,7 @@ const UploadPage = () => {
       <Box sx={{ 
         minHeight: '100vh',
         position: 'relative',
-        py: 4,
+        pt: '84px',
         '&::before': {
           content: '""',
           position: 'absolute',
@@ -129,14 +129,58 @@ const UploadPage = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backgroundColor: 'rgba(0, 0, 0, 0.2)',
           zIndex: 1
         }
       }}>
         <Container maxWidth="md" sx={{ position: 'relative', zIndex: 2 }}>
           <Paper sx={{ p: 4, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
-            <Typography variant="h4" component="h1" gutterBottom align="center">
+            <Typography 
+              variant="h2" 
+              component="h1" 
+              gutterBottom
+              sx={{
+                color: 'white',
+                fontWeight: 700,
+                textShadow: '0 0 10px rgba(62, 118, 244, 0.8), 0 0 20px rgba(62, 118, 244, 0.5)',
+                fontFamily: '"Orbitron", "Arial Black", "Arial", sans-serif',
+                letterSpacing: '0.02em',
+                marginBottom: { xs: 1.5, sm: 2, md: 2.5 },
+                fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem', lg: '3rem', xl: '3.5rem' },
+                textAlign: 'center',
+                position: 'relative',
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  bottom: '-10px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '60%',
+                  height: '2px',
+                  background: 'linear-gradient(90deg, transparent, rgba(62, 118, 244, 0.8), transparent)'
+                }
+              }}
+            >
               Upload Neuron Model
+            </Typography>
+            <Typography 
+              variant="h6" 
+              gutterBottom
+              sx={{
+                color: 'white',
+                opacity: 0.8,
+                fontWeight: 300,
+                letterSpacing: '0.05em',
+                fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+                marginBottom: 4,
+                fontSize: { xs: '1rem', sm: '1.2rem', md: '1.3rem' },
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                textAlign: 'center',
+                maxWidth: { xs: '100%', sm: '80%', md: '70%' },
+                mx: 'auto'
+              }}
+            >
+              Share your neuron models with the scientific community and contribute to the public database
             </Typography>
             
             {!networkStatus && (

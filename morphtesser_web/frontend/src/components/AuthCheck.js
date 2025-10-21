@@ -28,11 +28,11 @@ const AuthCheck = ({ children }) => {
         // });
         // if (!response.ok) throw new Error('令牌已过期');
         
-        console.log('认证成功:', user.username);
+        console.log('Authentication successful:', user.username);
         setAuthenticated(true);
       } catch (err) {
-        console.error('认证检查失败:', err.message);
-        setError('您需要登录才能访问此页面');
+        console.error('Authentication check failed:', err.message);
+        setError('You need to login to access this page');
         
         // 延迟跳转，给用户时间看到错误信息
         setTimeout(() => {

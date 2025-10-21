@@ -184,12 +184,12 @@ const ModelDetail = () => {
                     <TableRow>
                       <TableCell>Branch Count</TableCell>
                       <TableCell>{model.branchCount || 'Not calculated'}</TableCell>
-                      <TableCell>个</TableCell>
+                      <TableCell>count</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Terminal Count</TableCell>
                       <TableCell>{model.terminalCount || 'Not calculated'}</TableCell>
-                      <TableCell>个</TableCell>
+                      <TableCell>count</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>

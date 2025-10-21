@@ -14,7 +14,7 @@ const SimpleModelViewer = ({ url, width = '100%', height = 200 }) => {
     scene.background = new THREE.Color(0xf5f5f5);
     
     // 创建相机
-    const camera = new THREE.PerspectiveCamera(75, containerRef.current.clientWidth / containerRef.current.clientHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(75, containerRef.current.clientWidth / containerRef.current.clientHeight, 0.0001, 10000);
     camera.position.z = 5;
     
     // 创建渲染器

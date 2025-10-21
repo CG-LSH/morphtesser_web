@@ -94,10 +94,19 @@ const createModel = ({ name, type, swcFile }) => {
   });
 };
 
-const createModelFromOnlineBuilder = (formData, onUploadProgress) => {
+const createModelFromOnlineBuilder = (formData, onUploadProgress, signal) => {
   return axios.post('/api/models/create', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress,
+    signal, // 支持AbortSignal
+  });
+};
+
+const clearAllData = (token) => {
+  return axios.delete('/api/models/clear-all', {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
   });
 };
 
@@ -111,7 +120,8 @@ const modelService = {
   downloadModelFile,
   downloadDracoFile,
   createModel,
-  createModelFromOnlineBuilder
+  createModelFromOnlineBuilder,
+  clearAllData
 };
 
 export default modelService; 

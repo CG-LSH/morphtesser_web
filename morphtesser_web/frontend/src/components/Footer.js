@@ -9,7 +9,7 @@ const Footer = () => {
       mt: 'auto',
       backdropFilter: 'blur(10px)',
       borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-      width: '100vw',
+      width: '100%',
       margin: 0,
       padding: 0
     }}>
@@ -19,7 +19,7 @@ const Footer = () => {
         px: { xs: 2, sm: 3, md: 4 }
       }}>
         <Typography variant="body2" color="rgba(255, 255, 255, 0.7)" align="center">
-          © {new Date().getFullYear()} Neuron Online Modeling Platform | All rights reserved
+          © {new Date().getFullYear()} MorphTesser | All rights reserved
         </Typography>
       </Container>
     </Box>

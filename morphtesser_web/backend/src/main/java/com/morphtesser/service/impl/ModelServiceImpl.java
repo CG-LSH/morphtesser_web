@@ -305,14 +305,14 @@ public class ModelServiceImpl implements ModelService {
             String dracoHttpPath = "/uploads/draco/" + user.getUsername() + "/" + dracoFileName;
             
             try {
-                // 直接调用Python脚本进行Draco压缩
+                // 直接调用Python脚本进行Draco压缩（使用qp14）
                 String[] cmd = {
                     "C:\\Users\\15370\\anaconda3\\python.exe", 
                     "draco_compressor.py",
                     objFilePath,
                     dracoFilePath,
                     "7",  // compression_level
-                    "10"  // quantization_bits
+                    "14"  // quantization_bits (qp14)
                 };
                 
                 ProcessBuilder pb = new ProcessBuilder(cmd);

@@ -73,7 +73,7 @@ function AppShell() {
           <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
           <Route path="/models/:id" element={isAuthenticated ? <ModelDetail /> : <Navigate to="/login" />} />
 
-          <Route path="/online-builder" element={isAuthenticated ? <OnlineBuilder /> : <Navigate to="/login" />} />
+          <Route path="/online-builder" element={<OnlineBuilder />} />
           <Route path="/public-database" element={<PublicDatabase />} />
           <Route path="/neuromorpho-plugin" element={<NeuroMorphoPlugin />} />
           <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
