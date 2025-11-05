@@ -63,4 +63,11 @@ backend/uploads/
 
 # Misc
 .env
-.env.* 
+.env.*
+
+# Docker build outputs (too large for Git - use registry or cloud storage)
+*.tar
+*.tar.gz
+docker-multistage-output/output/
+docker_WEB_multistage/output/
+docker-multistage/output/ 
