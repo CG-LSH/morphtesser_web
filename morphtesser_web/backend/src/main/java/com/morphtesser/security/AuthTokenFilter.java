@@ -35,7 +35,7 @@ public class AuthTokenFilter extends OncePerRequestFilter {
         // 放行建模和数据集相关接口
         String path = request.getRequestURI();
         if (path.startsWith("/api/models/") || path.startsWith("/api/datasets/") || path.startsWith("/api/embed/") || 
-            path.startsWith("/embed/") || path.equals("/") || path.equals("/index.html") || path.startsWith("/static/")) {
+            path.startsWith("/api/temp/") || path.startsWith("/embed/") || path.equals("/") || path.equals("/index.html") || path.startsWith("/static/")) {
             filterChain.doFilter(request, response);
             return;
         }

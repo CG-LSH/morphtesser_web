@@ -2,6 +2,7 @@ package com.morphtesser;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 
@@ -10,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 @SpringBootApplication
+@EnableScheduling
 public class MorphtesserApplication {
 
     public static void main(String[] args) {
@@ -24,6 +26,9 @@ public class MorphtesserApplication {
             
             // 创建scripts目录
             Files.createDirectories(Paths.get("./scripts"));
+            
+            // 创建在线建模临时文件目录
+            Files.createDirectories(Paths.get("./temp/online-modeling"));
             
             // 复制球体模型到scripts目录
             File frontendSphere = new File("../frontend/public/models/sphere.obj");

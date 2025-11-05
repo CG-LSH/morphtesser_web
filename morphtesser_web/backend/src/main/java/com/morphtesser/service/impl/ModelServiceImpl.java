@@ -48,7 +48,7 @@ import java.io.InputStreamReader;
 public class ModelServiceImpl implements ModelService {
     private static final Logger logger = LoggerFactory.getLogger(ModelServiceImpl.class);
     
-    // 根目录写死
+    // 数据库功能的数据集路径（用户上传模型存储路径）
     private static final String BASE_DIR = "Z:/lsh/morphtesser_exp/DataSet/";
     
     @Autowired
@@ -65,6 +65,14 @@ public class ModelServiceImpl implements ModelService {
     
     @Autowired
     private ModelPreviewService modelPreviewService;
+    
+    // Python建模API URL（支持内网穿透地址）
+    @Value("${python.modeling.api.url:http://localhost:8000/swc2obj/}")
+    private String pythonModelingApiUrl;
+    
+    // 在线建模临时文件目录（不保存到数据库）
+    @Value("${dataset.online-modeling.temp-dir:./temp/online-modeling/}")
+    private String onlineModelingTempDir;
 
     @Override
     public ResponseEntity<?> uploadModel(MultipartFile file, String name, String token) {
@@ -222,26 +230,36 @@ public class ModelServiceImpl implements ModelService {
 
     @Override
     public ResponseEntity<?> createModelFromOnlineBuilder(String name, String type, String token, MultipartFile swcFile) {
-        try {
-            // 验证令牌并获取用户名（允许匿名）
-            String username = getUsernameFromToken(token);
-            User user;
-            if (username != null) {
-                user = getUserFromUsername(username);
-            } else {
-                user = userRepository.findByUsername("guest")
-                        .orElseThrow(() -> new RuntimeException("Guest user not found"));
+        // 使用临时目录，不保存到数据库
+        String sessionId = UUID.randomUUID().toString();
+        
+        // 规范化路径：如果是相对路径，转换为绝对路径（相对于项目根目录）
+        Path tempDirPath = Paths.get(onlineModelingTempDir);
+        if (!tempDirPath.isAbsolute()) {
+            // 相对于项目根目录（backend目录的父目录）
+            String projectRoot = System.getProperty("user.dir");
+            // 如果在backend目录运行，需要回到项目根目录
+            if (projectRoot.endsWith("backend")) {
+                projectRoot = new File(projectRoot).getParent();
             }
-            // 创建用户目录（匿名用户用guest目录）
-            String userDir = BASE_DIR + user.getUsername() + "/";
-            Files.createDirectories(Paths.get(userDir));
-            // 保存SWC文件
-            String swcFileName = UUID.randomUUID().toString() + ".swc";
-            String swcFilePath = Paths.get(userDir, swcFileName).toString();
+            tempDirPath = Paths.get(projectRoot, onlineModelingTempDir);
+        }
+        
+        Path sessionDirPath = tempDirPath.resolve(sessionId);
+        String sessionDir = sessionDirPath.toString() + File.separator;
+        File sessionDirFile = sessionDirPath.toFile();
+        if (!sessionDirFile.exists()) {
+            sessionDirFile.mkdirs();
+        }
+        
+        try {
+            // 保存SWC文件到临时目录
+            String swcFileName = "input.swc";
+            String swcFilePath = Paths.get(sessionDir, swcFileName).toString();
             swcFile.transferTo(new File(swcFilePath));
-            // 调用FastAPI服务，获得OBJ
+            // 调用FastAPI服务，获得OBJ（通过内网穿透访问本地主机的API）
             RestTemplate restTemplate = new RestTemplate();
-            String url = "http://localhost:8000/swc2obj/"; 
+            String url = pythonModelingApiUrl; 
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", new FileSystemResource(swcFilePath));
             // 关键：根据 type 传递 result_type
@@ -255,10 +273,8 @@ public class ModelServiceImpl implements ModelService {
             HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
             ResponseEntity<byte[]> response = restTemplate.exchange(
                 url, HttpMethod.POST, requestEntity, byte[].class);
-            String objFileName = "refine".equals(type)
-                    ? swcFileName.replace(".swc", "_refined.obj")
-                    : swcFileName.replace(".swc", ".obj");
-            String objFilePath = Paths.get(userDir, objFileName).toString();
+            String objFileName = "refine".equals(type) ? "output_refined.obj" : "output.obj";
+            String objFilePath = Paths.get(sessionDir, objFileName).toString();
 
             // 判定是否真正得到了 OBJ：避免将 JSON 错误写入 OBJ 导致 0 字节或极小文件
             String contentType = response.getHeaders().getContentType() != null
@@ -287,8 +303,8 @@ public class ModelServiceImpl implements ModelService {
                 boolean json2 = ct2.contains("application/json");
                 boolean small2 = b2 == null || b2.length < 200;
                 // 覆盖为 raw 命名
-                objFileName = swcFileName.replace(".swc", ".obj");
-                objFilePath = Paths.get(userDir, objFileName).toString();
+                objFileName = "output.obj";
+                objFilePath = Paths.get(sessionDir, objFileName).toString();
                 if (resp2.getStatusCode() == HttpStatus.OK && !json2 && !small2) {
                     Files.write(Paths.get(objFilePath), b2);
                     wroteObj = true;
@@ -301,8 +317,7 @@ public class ModelServiceImpl implements ModelService {
             
             // 启用Draco压缩
             String dracoFileName = objFileName.replace(".obj", ".drc");
-            String dracoFilePath = Paths.get(userDir, dracoFileName).toString();
-            String dracoHttpPath = "/uploads/draco/" + user.getUsername() + "/" + dracoFileName;
+            String dracoFilePath = Paths.get(sessionDir, dracoFileName).toString();
             
             try {
                 // 直接调用Python脚本进行Draco压缩（使用qp14）
@@ -329,58 +344,77 @@ public class ModelServiceImpl implements ModelService {
                 
                 int exitCode = process.waitFor();
                 
-                if (exitCode == 0 && new File(dracoFilePath).exists()) {
-                    logger.info("Draco压缩成功: {}", dracoFilePath);
-                } else {
+                if (exitCode != 0 || !new File(dracoFilePath).exists()) {
                     logger.warn("Draco压缩失败，继续使用OBJ文件: {}", output.toString());
-                    dracoHttpPath = null;
+                } else {
+                    logger.info("Draco压缩成功: {}", dracoFilePath);
                 }
             } catch (Exception e) {
                 logger.warn("Draco压缩异常: {}", e.getMessage());
-                dracoHttpPath = null;
             }
             
-            // 关键：数据库字段带上用户名子目录
-            String swcHttpPath = "/uploads/swc/" + user.getUsername() + "/" + swcFileName;
-            String objHttpPath = "/uploads/obj/" + user.getUsername() + "/" + objFileName;
+            // 在线建模不保存到数据库，使用临时路径和会话ID
+            String swcHttpPath = "/api/temp/online-modeling/" + sessionId + "/" + swcFileName;
+            String objHttpPath = "/api/temp/online-modeling/" + sessionId + "/" + objFileName;
+            String dracoHttpPath = null;
+            
+            // 检查Draco文件是否存在
+            File dracoFile = new File(dracoFilePath);
+            if (dracoFile.exists()) {
+                dracoHttpPath = "/api/temp/online-modeling/" + sessionId + "/" + dracoFileName;
+            }
+            
             // 获取OBJ文件大小
             long objSize = 0L;
             File objFile = new File(objFilePath);
             if (objFile.exists()) {
                 objSize = objFile.length();
             }
-            // 创建模型记录
-            NeuronModel model = new NeuronModel();
-            model.setName(name);
-            model.setUser(user); // 匿名用户归属于guest
-            model.setCreatedAt(new Date());
-            model.setFilePath(swcHttpPath);
-            model.setObjFilePath(objHttpPath);
-            if (dracoHttpPath != null) {
-                model.setDracoFilePath(dracoHttpPath);
-            }
-            model.setBrainRegion("未指定");
-            model.setDescription("未填写");
-            model.setFileType("swc");
-            model.setSpecies("未指定");
-            NeuronModel savedModel = modelRepository.save(model);
-            logger.info("在线建模成功: id={}, name={}, user={}, swcHttpPath={}, objHttpPath={}, dracoHttpPath={}", 
-                savedModel.getId(), name, user.getUsername(), swcHttpPath, objHttpPath, dracoHttpPath);
-            // 返回带objSize的结果
+            
+            logger.info("在线建模成功（临时文件）: sessionId={}, name={}, swcHttpPath={}, objHttpPath={}, dracoHttpPath={}", 
+                sessionId, name, swcHttpPath, objHttpPath, dracoHttpPath);
+            
+            // 返回结果（不保存到数据库）
             Map<String, Object> result = new HashMap<>();
-            result.put("id", savedModel.getId());
-            result.put("name", savedModel.getName());
+            result.put("sessionId", sessionId);  // 使用sessionId而不是数据库ID
+            result.put("name", name);
             result.put("swcUrl", swcHttpPath);
             result.put("objUrl", objHttpPath);
             if (dracoHttpPath != null) {
                 result.put("dracoUrl", dracoHttpPath);
             }
             result.put("objSize", objSize);
-            result.put("createdAt", savedModel.getCreatedAt());
+            result.put("createdAt", new Date());
+            result.put("isTemporary", true);  // 标记为临时数据
             return ResponseEntity.ok(result);
         } catch (Exception e) {
+            // 清理失败的临时文件
+            try {
+                deleteDirectory(sessionDirFile);
+            } catch (Exception cleanupEx) {
+                logger.warn("清理失败临时文件时出错: sessionId={}", sessionId, cleanupEx);
+            }
             logger.error("在线建模失败", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("创建失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 递归删除目录（辅助方法）
+     */
+    private void deleteDirectory(File directory) {
+        if (directory.exists() && directory.isDirectory()) {
+            File[] files = directory.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.isDirectory()) {
+                        deleteDirectory(file);
+                    } else {
+                        file.delete();
+                    }
+                }
+            }
+            directory.delete();
         }
     }
     

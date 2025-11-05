@@ -146,6 +146,11 @@ export default function EmbedMesh() {
         return objString;
     };
 
+    // 设置页面标题
+    React.useEffect(() => {
+        document.title = '3D Mesh Viewer - MorphTesser';
+    }, []);
+
     React.useEffect(() => {
         let isCancelled = false;
         async function resolve() {

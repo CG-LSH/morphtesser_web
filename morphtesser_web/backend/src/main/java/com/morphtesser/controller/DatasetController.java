@@ -24,8 +24,9 @@ import java.util.*;
 public class DatasetController {
 
     private static final Logger logger = LoggerFactory.getLogger(DatasetController.class);
+    
     private static final String DATASETS_DIR = "Y:/morphtesser_exp/Final_Results_Datasets/";
-    private static final String STATIC_INDEX_DIR = "morphtesser_web/backend/cache/swc-index/"; // 预生成索引文件目录
+    private static final String STATIC_INDEX_DIR = "morphtesser_web/backend/cache/swc-index/";
     // 静态索引方案：不再使用内存列表缓存
 
     @GetMapping("/list")
@@ -217,13 +218,13 @@ public class DatasetController {
     @GetMapping("/summaries")
     public ResponseEntity<List<Map<String, Object>>> datasetSummaries() {
         try {
-            File datasetsDir = new File(DATASETS_DIR);
-            if (!datasetsDir.exists() || !datasetsDir.isDirectory()) {
+            File datasetsDirFile = new File(DATASETS_DIR);
+            if (!datasetsDirFile.exists() || !datasetsDirFile.isDirectory()) {
                 return ResponseEntity.ok(new ArrayList<>());
             }
 
             List<Map<String, Object>> summaries = new ArrayList<>();
-            File[] datasetDirs = datasetsDir.listFiles(File::isDirectory);
+            File[] datasetDirs = datasetsDirFile.listFiles(File::isDirectory);
             if (datasetDirs != null) {
                 for (File datasetDir : datasetDirs) {
                     Map<String, Object> s = new HashMap<>();

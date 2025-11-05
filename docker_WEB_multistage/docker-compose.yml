@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # MySQL数据库
+  db:
+    image: mysql:8.0
+    container_name: morphtesser-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: morphtesserdb
+      MYSQL_USER: morphtesser
+      MYSQL_PASSWORD: ${DB_PASSWORD:-morphtesser123}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - db_data:/var/lib/mysql
+      - ../docker/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ../docker/database/backup:/backup
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "3307:3306"
+    restart: unless-stopped
+    networks:
+      - morphtesser-network
+    command: --default-authentication-plugin=mysql_native_password
+
+  # 后端API服务 (Spring Boot) - 多阶段构建
+  backend:
+    build:
+      context: ..
+      dockerfile: docker-multistage-output/Dockerfile.backend
+    container_name: morphtesser-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/morphtesserdb?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-morphtesser}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-morphtesser123}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-prod}
+      PYTHON_MODELING_API_URL: ${PYTHON_MODELING_API_URL:-http://localhost:8000/swc2obj/}
+      FILE_UPLOAD_DIR: /app/uploads
+      DATA_DIR: ${DATA_DIR:-/app/data}
+      DATASET_UPLOAD_BASE_DIR: ${DATASET_UPLOAD_BASE_DIR:-/app/uploads/datasets/}
+      DATASET_PUBLIC_BASE_DIR: ${DATASET_PUBLIC_BASE_DIR:-/app/data/public-datasets/}
+      DATASET_NEUROMORPHO_LOCAL_PATH: ${DATASET_NEUROMORPHO_LOCAL_PATH:-/app/data/neuromorpho/results}
+      DATASET_NEUROMORPHO_REMOTE_BASE: ${DATASET_NEUROMORPHO_REMOTE_BASE:-http://localhost:5000/shared/morphtesser_exp/neuromorpho_08}
+      DATASET_INDEX_CACHE_DIR: ${DATASET_INDEX_CACHE_DIR:-/app/cache/swc-index/}
+      DATASET_ONLINE_MODELING_TEMP_DIR: ${DATASET_ONLINE_MODELING_TEMP_DIR:-/app/temp/online-modeling/}
+      DATASET_ONLINE_MODELING_CLEANUP_MAX_AGE_HOURS: ${DATASET_ONLINE_MODELING_CLEANUP_MAX_AGE_HOURS:-1}
+      SMB_HOST: ${SMB_HOST:-}
+      SMB_DOMAIN: ${SMB_DOMAIN:-}
+      SMB_USERNAME: ${SMB_USERNAME:-}
+      SMB_PASSWORD: ${SMB_PASSWORD:-}
+      SMB_SHARE: ${SMB_SHARE:-}
+      SMB_ROOT: ${SMB_ROOT:-}
+      JWT_SECRET: ${JWT_SECRET:-morphtesserSecretKey1234567890123456789012345678901234567890123456789012345678901234}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./uploads:/app/uploads
+      - ${DATASET_PUBLIC_BASE_DIR:-./data/public-datasets}:/app/data/public-datasets:ro
+      - ${DATASET_NEUROMORPHO_LOCAL_PATH:-./data/neuromorpho}:/app/data/neuromorpho:ro
+      - ./cache/swc-index:/app/cache/swc-index
+      - ./temp/online-modeling:/app/temp/online-modeling
+      - ./logs/backend:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - morphtesser-network
+
+  # 前端服务 (Nginx) - 多阶段构建
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker-multistage-output/Dockerfile.frontend
+    container_name: morphtesser-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - morphtesser-network
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  morphtesser-network:
+    driver: bridge
+

@@ -62,6 +62,7 @@ public class SecurityConfiguration {
                 .requestMatchers("/static/**").permitAll() // 允许访问静态资源
                 .requestMatchers("/api/models/**").permitAll() // 允许所有人访问建模相关接口
                 .requestMatchers("/api/datasets/**").permitAll() // 允许所有人访问数据集相关接口
+                .requestMatchers("/api/temp/**").permitAll() // 允许所有人访问临时文件（在线建模）
                 .requestMatchers("/uploads/**").permitAll() // 允许所有人访问静态资源
                 .anyRequest().authenticated() // 其他接口仍需认证
             )
