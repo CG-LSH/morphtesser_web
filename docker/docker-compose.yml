@@ -1,0 +1,72 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: morphtesser-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILE=prod
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/morphtesserdb?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=morphtesser123
+      - PYTHON_MODELING_API_URL=http://localhost:8000/swc2obj/
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./temp:/app/temp
+      - ./cache:/app/cache
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - morphtesser-network
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: morphtesser-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - morphtesser-network
+
+  db:
+    image: mysql:8.0
+    container_name: morphtesser-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=morphtesser123
+      - MYSQL_DATABASE=morphtesserdb
+      - MYSQL_USER=morphtesser
+      - MYSQL_PASSWORD=morphtesser123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pmorphtesser123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - morphtesser-network
+
+networks:
+  morphtesser-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+
