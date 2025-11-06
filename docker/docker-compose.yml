@@ -1,4 +1,32 @@
+version: '3.8'
+
 services:
+  # MySQL数据库
+  db:
+    image: mysql:8.0
+    container_name: morphtesser-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: morphtesserdb
+      MYSQL_USER: morphtesser
+      MYSQL_PASSWORD: ${DB_PASSWORD:-morphtesser123}
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "3307:3306"  # 使用3307映射容器内的3306，避免与本地MySQL冲突
+    restart: unless-stopped
+    networks:
+      - morphtesser-network
+    command: --default-authentication-plugin=mysql_native_password
+
+  # 后端API服务 (Spring Boot) - 多阶段构建
   backend:
     build:
       context: ..
@@ -7,17 +35,50 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SPRING_PROFILE=prod
-      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/morphtesserdb?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=morphtesser123
-      - PYTHON_MODELING_API_URL=http://localhost:8000/swc2obj/
+      # Spring配置
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/morphtesserdb?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-morphtesser}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-morphtesser123}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-prod}
+      
+      # Python建模API服务（通过内网穿透访问本地主机的API）
+      # 格式：http://内网穿透公网地址:端口/swc2obj/
+      PYTHON_MODELING_API_URL: ${PYTHON_MODELING_API_URL:-http://localhost:8000/swc2obj/}
+      
+      # 文件路径配置
+      FILE_UPLOAD_DIR: /app/uploads
+      DATA_DIR: ${DATA_DIR:-/app/data}
+      
+      # 数据集路径配置
+      DATASET_UPLOAD_BASE_DIR: ${DATASET_UPLOAD_BASE_DIR:-/app/uploads/datasets/}
+      DATASET_PUBLIC_BASE_DIR: ${DATASET_PUBLIC_BASE_DIR:-/app/data/public-datasets/}
+      DATASET_NEUROMORPHO_LOCAL_PATH: ${DATASET_NEUROMORPHO_LOCAL_PATH:-/app/data/neuromorpho/results}
+      DATASET_NEUROMORPHO_REMOTE_BASE: ${DATASET_NEUROMORPHO_REMOTE_BASE:-http://localhost:5000/shared/morphtesser_exp/neuromorpho_08}
+      DATASET_INDEX_CACHE_DIR: ${DATASET_INDEX_CACHE_DIR:-/app/cache/swc-index/}
+      DATASET_ONLINE_MODELING_TEMP_DIR: ${DATASET_ONLINE_MODELING_TEMP_DIR:-/app/temp/online-modeling/}
+      DATASET_ONLINE_MODELING_CLEANUP_MAX_AGE_HOURS: ${DATASET_ONLINE_MODELING_CLEANUP_MAX_AGE_HOURS:-1}
+      
+      # SMB配置（如果需要）
+      SMB_HOST: ${SMB_HOST:-}
+      SMB_DOMAIN: ${SMB_DOMAIN:-}
+      SMB_USERNAME: ${SMB_USERNAME:-}
+      SMB_PASSWORD: ${SMB_PASSWORD:-}
+      SMB_SHARE: ${SMB_SHARE:-}
+      SMB_ROOT: ${SMB_ROOT:-}
+      
+      # JWT配置
+      JWT_SECRET: ${JWT_SECRET:-morphtesserSecretKey1234567890123456789012345678901234567890123456789012345678901234}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      
+      # 日志级别
+      LOGGING_LEVEL_ROOT: ${LOG_LEVEL:-INFO}
     volumes:
       - ./uploads:/app/uploads
-      - ./logs:/app/logs
-      - ./data:/app/data
-      - ./temp:/app/temp
-      - ./cache:/app/cache
+      - ${DATASET_PUBLIC_BASE_DIR:-./data/public-datasets}:/app/data/public-datasets:ro
+      - ${DATASET_NEUROMORPHO_LOCAL_PATH:-./data/neuromorpho}:/app/data/neuromorpho:ro
+      - ./cache/swc-index:/app/cache/swc-index
+      - ./temp/online-modeling:/app/temp/online-modeling
+      - ./logs/backend:/app/logs
     depends_on:
       db:
         condition: service_healthy
@@ -25,6 +86,7 @@ services:
     networks:
       - morphtesser-network
 
+  # 前端服务 (Nginx) - 多阶段构建
   frontend:
     build:
       context: ..
@@ -42,31 +104,11 @@ services:
     networks:
       - morphtesser-network
 
-  db:
-    image: mysql:8.0
-    container_name: morphtesser-mysql
-    environment:
-      - MYSQL_ROOT_PASSWORD=morphtesser123
-      - MYSQL_DATABASE=morphtesserdb
-      - MYSQL_USER=morphtesser
-      - MYSQL_PASSWORD=morphtesser123
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pmorphtesser123"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - morphtesser-network
+volumes:
+  db_data:
+    driver: local
 
 networks:
   morphtesser-network:
     driver: bridge
-
-volumes:
-  mysql-data:
 
