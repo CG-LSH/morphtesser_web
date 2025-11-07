@@ -15,6 +15,8 @@ services:
     volumes:
       # MySQL 数据持久化卷（数据库文件存储位置）
       - db_data:/var/lib/mysql
+      # MySQL 初始化脚本（首次启动空库时自动执行）
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
