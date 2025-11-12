@@ -1,0 +1,40 @@
+CREATE DATABASE IF NOT EXISTS morphtesserdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE morphtesserdb;
+
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100),
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'USER',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS models (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    file_path VARCHAR(512),
+    preview_image VARCHAR(512),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS neuron_models (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    neuron_name VARCHAR(255) NOT NULL,
+    species VARCHAR(255),
+    brain_region VARCHAR(255),
+    swc_path VARCHAR(512),
+    obj_path VARCHAR(512),
+    draco_path VARCHAR(512),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO users (username, email, password, role)
+VALUES ('admin', 'admin@example.com', '$2a$10$u9Pz5IqIy2I7.CsKD11FXuw4m/bFhx1ip00/3fDhdQMteiOv7IHrK', 'ADMIN')
+ON DUPLICATE KEY UPDATE username=username;
+

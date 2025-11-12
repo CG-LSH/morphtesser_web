@@ -1,10 +1,9 @@
-# 后端多阶段构建 Dockerfile
-# 阶段1: 构建阶段 (Maven + Java 21)
+# 后端多阶段构建（容器内监听 80，供直连方案使用）
 FROM maven:3.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-# 配置 Maven 使用国内镜像源（加速构建）
+# 预配置 Maven 镜像加速
 RUN mkdir -p /root/.m2 && \
     echo '<?xml version="1.0" encoding="UTF-8"?>' > /root/.m2/settings.xml && \
     echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> /root/.m2/settings.xml && \
@@ -20,44 +19,36 @@ RUN mkdir -p /root/.m2 && \
     echo '  </mirrors>' >> /root/.m2/settings.xml && \
     echo '</settings>' >> /root/.m2/settings.xml
 
-# 复制 Maven 配置文件
 COPY morphtesser_web/backend/pom.xml ./
 
-# 下载依赖（利用 Docker 缓存层）
+# 预下载依赖（利用缓存层）
 RUN mvn dependency:go-offline -B || true
 
-# 复制源代码
 COPY morphtesser_web/backend/src ./src
 
-# 构建应用（跳过测试以加快构建速度）
 RUN mvn clean package -DskipTests -B
 
-# 阶段2: 运行阶段 (Java 21 JRE)
 FROM eclipse-temurin:21-jre
 
-# 设置工作目录
 WORKDIR /app
 
-# 从构建阶段复制 JAR 文件
 COPY --from=builder /app/target/morphtesser-backend-0.0.1-SNAPSHOT.jar app.jar
 
-# 创建必要目录（包括数据集相关目录）
-RUN mkdir -p /app/uploads /app/logs /app/data /app/temp /app/scripts /app/cache/swc-index && \
+RUN mkdir -p /app/uploads /app/logs /app/data /app/temp /app/cache/swc-index && \
     mkdir -p /app/uploads/datasets \
              /app/data/public-datasets \
              /app/data/neuromorpho/results \
-             /app/temp/online-modeling && \
+             /app/temp/online-modeling \
+             /app/uploads/LSH && \
     chmod -R 755 /app
 
-# 创建非 root 用户（安全最佳实践）
 RUN groupadd -r spring && \
     useradd -r -g spring spring && \
     chown -R spring:spring /app
 
 USER spring:spring
 
-# 暴露端口
-EXPOSE 8080
+EXPOSE 80
 
-# 启动命令（使用环境变量，支持 SPRING_PROFILES_ACTIVE 或 SPRING_PROFILE）
 ENTRYPOINT ["sh", "-c", "java -Xmx2G -Xms512M -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-${SPRING_PROFILE:-prod}} -jar app.jar"]
+

@@ -4,24 +4,29 @@ import { Link } from 'react-router-dom';
 import ThreeDRotationIcon from '@mui/icons-material/ThreeDRotation';
 import DownloadIcon from '@mui/icons-material/Download';
 import SwcLinePreview from './SwcLinePreview';
+import { resolveApiUrl } from '../utils/api';
 
 function downloadFile(url, filename) {
   const a = document.createElement('a');
-  a.href = url;
-  a.setAttribute('download', filename || url.split('/').pop());
+  const resolvedUrl = resolveApiUrl(url);
+  a.href = resolvedUrl;
+  const defaultName = resolvedUrl.split('/').pop();
+  a.setAttribute('download', filename || defaultName);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 }
 
 function downloadFileByFetch(url, filename) {
-  fetch(url)
+  const resolvedUrl = resolveApiUrl(url);
+  fetch(resolvedUrl)
     .then(res => res.blob())
     .then(blob => {
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = filename || url.split('/').pop();
+      const defaultName = resolvedUrl.split('/').pop();
+      a.download = filename || defaultName;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -34,7 +39,7 @@ const ModelCard = ({ model, onPreview }) => {
     <Card sx={{ height: 380, display: 'flex', flexDirection: 'column', borderRadius: 3, boxShadow: 3, backgroundColor: 'rgba(255,255,255,0.97)', overflow: 'hidden' }}>
       {/* 顶部3D区 */}
       <Box sx={{ py: 2, textAlign: 'center', borderBottom: '1px solid #f0f0f0', background: 'linear-gradient(180deg,#f7fafd 60%,#fff 100%)' }}>
-        {model.swcUrl && <SwcLinePreview swcUrl={model.swcUrl} height={180} />}
+        {model.swcUrl && <SwcLinePreview swcUrl={resolveApiUrl(model.swcUrl)} height={180} />}
         {/* 删除3D图标和文字部分 */}
       </Box>
       {/* 中部名称描述 */}

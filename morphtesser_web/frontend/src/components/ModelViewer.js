@@ -7,6 +7,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { EdgeSplitModifier } from 'three/examples/jsm/modifiers/EdgeSplitModifier';
+import { resolveApiUrl } from '../utils/api';
 
 const ModelViewer = React.forwardRef(({ objUrl, dracoUrl, swcUrl, viewMode = "both", width = '100%', height = '100%', onResetView, backgroundColor = 0x000000, wireframeMode = false, doubleClickDistance = 0.2, useEdgeSplit = false }, ref) => {
   const mountRef = useRef(null);
@@ -757,7 +758,7 @@ const ModelViewer = React.forwardRef(({ objUrl, dracoUrl, swcUrl, viewMode = "bo
     }
     // 加载SWC模型
     if (swcUrl) {
-      fetch(swcUrl)
+      fetch(resolveApiUrl(swcUrl))
         .then(response => response.text())
         .then(data => {
           const swcGroup = new THREE.Group();

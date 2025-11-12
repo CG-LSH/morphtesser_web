@@ -15,7 +15,6 @@ import axios from 'axios';
 
 // 创建一个 axios 实例，设置基础配置
 const api = axios.create({
-  baseURL: 'http://localhost:3000',  // 确保这个地址匹配你的后端服务器地址
   timeout: 30000,  // 设置超时时间为 30 秒
 });
 

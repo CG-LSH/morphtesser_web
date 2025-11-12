@@ -16,6 +16,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import * as THREE from 'three';
+import { resolveApiUrl } from '../utils/api';
 
 // 错误边界组件
 class ErrorBoundary extends React.Component {
@@ -69,6 +70,7 @@ class ErrorBoundary extends React.Component {
 const OnlineBuilder = () => {
   const navigate = useNavigate();
   const neuronBg = NeuronBackground();
+  const fetchWithResolvedUrl = (url, options) => fetch(resolveApiUrl(url), options);
   // 页面刷新后重置所有状态
   const [swcFiles, setSwcFiles] = useState([]);
   
@@ -329,7 +331,7 @@ const OnlineBuilder = () => {
               objSize = Number(r.objSize);
             } else if (objUrl) {
               try {
-                const resp = await fetch(objUrl, { method: 'HEAD' });
+                const resp = await fetchWithResolvedUrl(objUrl, { method: 'HEAD' });
                 const size = resp.headers.get('content-length');
                 if (size) objSize = Number(size);
               } catch {}
@@ -382,7 +384,7 @@ const OnlineBuilder = () => {
   const handleDownloadSingle = (file) => {
     const objUrl = file.objUrl || file.objFilePath;
     if (!objUrl) return;
-    fetch(objUrl)
+    fetchWithResolvedUrl(objUrl)
         .then(res => res.blob())
         .then(blob => {
           const url = window.URL.createObjectURL(blob);
@@ -442,7 +444,7 @@ const OnlineBuilder = () => {
         if (file.drcUrl) {
           try {
             // 下载DRC文件
-            const drcResponse = await fetch(file.drcUrl);
+            const drcResponse = await fetchWithResolvedUrl(file.drcUrl);
             const drcArrayBuffer = await drcResponse.arrayBuffer();
             
             // 解压DRC为几何体
@@ -463,7 +465,7 @@ const OnlineBuilder = () => {
             console.warn('DRC processing failed, falling back to OBJ:', drcError);
             // 如果DRC处理失败，回退到OBJ文件
             if (file.objUrl) {
-              const response = await fetch(file.objUrl);
+              const response = await fetchWithResolvedUrl(file.objUrl);
               const blob = await response.blob();
               let fname = file.filename || `model${idx+1}.obj`;
               if (!fname.toLowerCase().endsWith('.obj')) fname += '.obj';
@@ -472,7 +474,7 @@ const OnlineBuilder = () => {
           }
         } else if (file.objUrl) {
           // 如果没有DRC文件，直接使用OBJ文件
-          const response = await fetch(file.objUrl);
+          const response = await fetchWithResolvedUrl(file.objUrl);
           const blob = await response.blob();
           let fname = file.filename || `model${idx+1}.obj`;
           if (!fname.toLowerCase().endsWith('.obj')) fname += '.obj';

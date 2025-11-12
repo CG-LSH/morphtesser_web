@@ -48,8 +48,35 @@ import java.io.InputStreamReader;
 public class ModelServiceImpl implements ModelService {
     private static final Logger logger = LoggerFactory.getLogger(ModelServiceImpl.class);
     
-    // 数据库功能的数据集路径（用户上传模型存储路径）
-    private static final String BASE_DIR = "Z:/lsh/morphtesser_exp/DataSet/";
+    @Value("${dataset.upload.base-dir:/app/uploads}")
+    private String datasetUploadBaseDir;
+
+    private Path basePath() {
+        return Paths.get(datasetUploadBaseDir).toAbsolutePath().normalize();
+    }
+
+    private Path resolveUploadPath(String... segments) {
+        Path path = basePath();
+        for (String segment : segments) {
+            path = path.resolve(segment);
+        }
+        return path.normalize();
+    }
+
+    private Path resolveRelativePath(String relative) {
+        return basePath().resolve(relative).normalize();
+    }
+
+    private String toRelative(Path path) {
+        Path normalized = path.toAbsolutePath().normalize();
+        Path base = basePath();
+        try {
+            return base.relativize(normalized).toString().replace("\\", "/");
+        } catch (IllegalArgumentException ex) {
+            logger.warn("Path {} is outside of base directory {}; storing absolute path", normalized, base);
+            return normalized.toString().replace("\\", "/");
+        }
+    }
     
     @Autowired
     private ModelRepository modelRepository;
@@ -93,26 +120,25 @@ public class ModelServiceImpl implements ModelService {
             Long modelId = savedModel.getId();
 
             // 3. 构建目标目录
-            String relativeDir = userId + "/" + modelId + "/";
-            String targetDir = BASE_DIR + relativeDir;
-            File dir = new File(targetDir);
-            if (!dir.exists()) dir.mkdirs();
+            Path targetDir = resolveUploadPath(String.valueOf(userId), String.valueOf(modelId));
+            Files.createDirectories(targetDir);
 
             // 4. 保存文件
             String fileName = file.getOriginalFilename();
-            String relativeFilePath = relativeDir + fileName;
-            String absoluteFilePath = BASE_DIR + relativeFilePath;
-            file.transferTo(new File(absoluteFilePath));
-            model.setFilePath(relativeFilePath);
+            Path swcPath = targetDir.resolve(fileName);
+            file.transferTo(swcPath.toFile());
+            model.setFilePath(toRelative(swcPath));
 
             // 5. 如果是SWC，调用Python服务
             String extension = fileName.substring(fileName.lastIndexOf("."));
             if (extension.equalsIgnoreCase(".swc")) {
-                Map<String, Object> result = pythonService.convertSwcToObj(absoluteFilePath);
+                Map<String, Object> result = pythonService.convertSwcToObj(swcPath.toString());
                 // Python返回obj的绝对路径，转为相对路径
                 String objAbsPath = (String) result.get("objPath");
-                String objRelPath = objAbsPath.replace(BASE_DIR, "");
-                model.setObjFilePath(objRelPath);
+                if (objAbsPath != null) {
+                    String objRelPath = toRelative(Paths.get(objAbsPath));
+                    model.setObjFilePath(objRelPath);
+                }
                 model.setLength((Double) result.get("length"));
                 model.setSurfaceArea((Double) result.get("surfaceArea"));
                 model.setVolume((Double) result.get("volume"));
@@ -176,12 +202,10 @@ public class ModelServiceImpl implements ModelService {
         try {
             // 删除文件（SWC/OBJ）
             if (model.getFilePath() != null) {
-                Path swcFilePath = Paths.get(BASE_DIR, model.getFilePath());
-                Files.deleteIfExists(swcFilePath);
+                Files.deleteIfExists(resolveRelativePath(model.getFilePath()));
             }
             if (model.getObjFilePath() != null) {
-                Path objFilePath = Paths.get(BASE_DIR, model.getObjFilePath());
-                Files.deleteIfExists(objFilePath);
+                Files.deleteIfExists(resolveRelativePath(model.getObjFilePath()));
             }
             modelRepository.delete(model);
             logger.info("模型删除成功: id={}, name={}, user={}", id, model.getName(), username);
@@ -207,15 +231,17 @@ public class ModelServiceImpl implements ModelService {
         }
         try {
             String relPath;
-            if ("obj".equals(type)) {
+            if ("obj".equalsIgnoreCase(type)) {
                 relPath = model.getObjFilePath();
-            } else if ("swc".equals(type)) {
+            } else if ("swc".equalsIgnoreCase(type)) {
                 relPath = model.getFilePath();
+            } else if ("draco".equalsIgnoreCase(type)) {
+                relPath = model.getDracoFilePath();
             } else {
                 return ResponseEntity.badRequest().build();
             }
             if (relPath == null) return ResponseEntity.notFound().build();
-            Path absPath = Paths.get(BASE_DIR, relPath);
+            Path absPath = resolveRelativePath(relPath);
             Resource resource = new UrlResource(absPath.toUri());
             if (resource.exists()) {
                 return ResponseEntity.ok(resource);

@@ -54,8 +54,8 @@ const ModelDetail = () => {
   const handleDownload = (fileType) => {
     // 根据文件类型下载不同的文件
     const fileUrl = fileType === 'swc' 
-      ? `http://localhost:8080/api/models/${id}/download/swc`
-      : `http://localhost:8080/api/models/${id}/download/obj`;
+      ? `/api/models/${id}/download/swc`
+      : `/api/models/${id}/download/obj`;
     
     const link = document.createElement('a');
     link.href = fileUrl;
@@ -121,7 +121,7 @@ const ModelDetail = () => {
                     <Grid item xs={12} md={6}>
                       <Typography variant="h6" gutterBottom>SWC Skeleton</Typography>
                       <ModelViewer 
-                        modelUrl={`http://localhost:8080/api/models/${id}/file/swc`} 
+                        modelUrl={`/api/models/${id}/file/swc`} 
                         modelType="swc" 
                         height="400px"
                       />
@@ -129,7 +129,7 @@ const ModelDetail = () => {
                     <Grid item xs={12} md={6}>
                       <Typography variant="h6" gutterBottom>OBJ Model</Typography>
                       <ModelViewer 
-                        modelUrl={`http://localhost:8080/api/models/${id}/file/obj`} 
+                        modelUrl={`/api/models/${id}/file/obj`} 
                         modelType="obj" 
                         height="400px"
                       />
@@ -137,7 +137,7 @@ const ModelDetail = () => {
                   </Grid>
                 ) : (
                   <ModelViewer 
-                    modelUrl={`http://localhost:8080/api/models/${id}/file/obj`} 
+                    modelUrl={`/api/models/${id}/file/obj`} 
                     modelType="obj" 
                     height="500px"
                   />

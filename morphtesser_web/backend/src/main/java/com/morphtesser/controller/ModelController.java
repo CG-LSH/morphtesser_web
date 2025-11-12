@@ -8,6 +8,7 @@ import com.morphtesser.service.ModelService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,13 +42,39 @@ import org.springframework.core.io.UrlResource;
 
 @RestController
 @RequestMapping("/api/models")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "http://cvcd.xyz", "https://cvcd.xyz", "http://cvcd.xyz:34080", "https://cvcd.xyz:34080"})
 public class ModelController {
 
     private static final Logger logger = LoggerFactory.getLogger(ModelController.class);
     
-    // 根目录写死
-    private static final String BASE_DIR = "Z:/lsh/morphtesser_exp/DataSet/";
+    @Value("${dataset.upload.base-dir:/app/uploads}")
+    private String datasetUploadBaseDir;
+
+    @Value("${dataset.sample.dir:/app/uploads/LSH}")
+    private String datasetSampleDir;
+
+    private Path uploadBasePath() {
+        return Paths.get(datasetUploadBaseDir).toAbsolutePath().normalize();
+    }
+
+    private Path resolveRelativePath(String relative) {
+        if (relative == null) {
+            return uploadBasePath();
+        }
+        String sanitized = relative.startsWith("/") ? relative.substring(1) : relative;
+        return uploadBasePath().resolve(sanitized).normalize();
+    }
+
+    private String toRelative(Path path) {
+        Path normalized = path.toAbsolutePath().normalize();
+        Path base = uploadBasePath();
+        try {
+            return base.relativize(normalized).toString().replace("\\", "/");
+        } catch (IllegalArgumentException ex) {
+            logger.warn("Path {} is outside of base directory {}; storing absolute path", normalized, base);
+            return normalized.toString().replace("\\", "/");
+        }
+    }
 
     @Autowired
     private ModelService modelService;
@@ -156,51 +183,9 @@ public class ModelController {
             @RequestParam("token") String token) {
         
         logger.info("获取模型文件: id={}, type={}", id, type);
-        
-        String username = getUsernameFromToken("Bearer " + token);
-        if (username == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        
-        NeuronModel model = modelRepository.findById(id).orElse(null);
-        if (model == null) {
-            return ResponseEntity.notFound().build();
-        }
-        if (!model.getUser().getUsername().equals(username)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-        
-        try {
-            String relPath;
-            if ("obj".equals(type)) {
-                relPath = model.getObjFilePath();
-            } else if ("swc".equals(type)) {
-                relPath = model.getFilePath();
-            } else if ("draco".equals(type)) {
-                relPath = model.getDracoFilePath();
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
-            
-            if (relPath == null) {
-                return ResponseEntity.notFound().build();
-            }
-            
-            Path filePath = Paths.get(BASE_DIR, relPath);
-            Resource resource = new FileSystemResource(filePath.toFile());
-            
-            if (resource.exists() && resource.isReadable()) {
-                return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filePath.getFileName() + "\"")
-                    .body(resource);
-            } else {
-                return ResponseEntity.notFound().build();
-            }
-            
-        } catch (Exception e) {
-            logger.error("获取模型文件失败", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+
+        String actualToken = token != null && token.startsWith("Bearer ") ? token : "Bearer " + token;
+        return modelService.getModelFile(id, type, actualToken);
     }
 
     @GetMapping("/{id}/download/{type}")
@@ -249,8 +234,8 @@ public class ModelController {
             NeuronModel model = modelResponse.getBody();
             
             // 检查预览图片路径
-            String previewPath = Paths.get("./uploads/previews", id + ".png").toString();
-            File previewFile = new File(previewPath);
+            Path previewPath = resolveRelativePath(Paths.get("previews", id + ".png").toString());
+            File previewFile = previewPath.toFile();
             
             if (!previewFile.exists()) {
                 // 如果预览图片不存在，返回默认图片
@@ -261,7 +246,7 @@ public class ModelController {
             }
             
             // 返回预览图片
-            Resource resource = new FileSystemResource(previewFile);
+                Resource resource = new FileSystemResource(previewFile);
             return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(resource);
@@ -298,7 +283,7 @@ public class ModelController {
             }
         }
         
-        Path path = Paths.get(model.getObjFilePath());
+        Path path = resolveRelativePath(model.getObjFilePath());
         Resource resource = new FileSystemResource(path.toFile());
         
         return ResponseEntity.ok()
@@ -311,7 +296,7 @@ public class ModelController {
     public ResponseEntity<?> createModel(
             @RequestParam("name") String name,
             @RequestParam("type") String type,
-            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Authorization", required = false) String token,
             @RequestParam("swcFile") MultipartFile swcFile) {
         
         logger.info("创建在线模型: name={}, type={}", name, type);
@@ -326,7 +311,7 @@ public class ModelController {
     @PostMapping("/{id}/compress-draco")
     public ResponseEntity<?> compressModelToDraco(
             @PathVariable Long id,
-            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Authorization", required = false) String token,
             @RequestParam(value = "compression_level", defaultValue = "7") int compressionLevel,
             @RequestParam(value = "quantization_bits", defaultValue = "10") int quantizationBits) {
         
@@ -345,12 +330,12 @@ public class ModelController {
             }
             
             // 调用Python服务进行压缩
-            String objAbsPath = BASE_DIR + model.getObjFilePath();
-            Map<String, Object> dracoResult = modelService.compressModelToDraco(objAbsPath, compressionLevel, quantizationBits);
+            Path objPath = resolveRelativePath(model.getObjFilePath());
+            Map<String, Object> dracoResult = modelService.compressModelToDraco(objPath.toString(), compressionLevel, quantizationBits);
             
             if (dracoResult != null && dracoResult.containsKey("success") && (Boolean) dracoResult.get("success")) {
                 String dracoAbsPath = (String) dracoResult.get("output_path");
-                String dracoRelPath = dracoAbsPath.replace(BASE_DIR, "");
+                String dracoRelPath = toRelative(Paths.get(dracoAbsPath));
                 model.setDracoFilePath(dracoRelPath);
                 model.setCompressionRatio((Double) dracoResult.get("compression_ratio"));
                 modelRepository.save(model);
@@ -376,7 +361,7 @@ public class ModelController {
 
     @GetMapping("/public-files")
     public List<Map<String, Object>> listPublicFiles() {
-        File dir = new File("Z:/lsh/morphtesser_exp/DataSet/LSH/");
+        File dir = Paths.get(datasetSampleDir).toFile();
         File[] files = dir.listFiles((d, name) -> name.toLowerCase().endsWith(".obj") || name.toLowerCase().endsWith(".swc"));
         List<Map<String, Object>> result = new ArrayList<>();
         if (files != null) {
@@ -420,8 +405,8 @@ public class ModelController {
             }
             
             // 构建本地文件路径
-            String localPath = BASE_DIR + model.getDracoFilePath().replace("/uploads/draco/", "");
-            File file = new File(localPath);
+            Path dracoPath = resolveRelativePath(model.getDracoFilePath());
+            File file = dracoPath.toFile();
             
             if (!file.exists()) {
                 return ResponseEntity.notFound().build();

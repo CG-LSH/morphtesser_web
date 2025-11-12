@@ -1,0 +1,25 @@
+# 前端多阶段构建（绕过 Nginx，容器内监听 80）
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+COPY morphtesser_web/frontend/package*.json ./
+
+RUN npm install
+
+COPY morphtesser_web/frontend/ ./
+
+RUN npm run build
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+RUN npm install -g serve
+
+COPY --from=builder /app/build ./build
+
+EXPOSE 80
+
+CMD ["serve", "-s", "build", "-l", "80"]
+

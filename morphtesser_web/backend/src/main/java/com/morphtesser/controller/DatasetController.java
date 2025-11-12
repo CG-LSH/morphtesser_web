@@ -9,37 +9,81 @@ import org.springframework.http.MediaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/datasets")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "http://cvcd.xyz", "https://cvcd.xyz", "http://cvcd.xyz:34080", "https://cvcd.xyz:34080"})
 public class DatasetController {
 
     private static final Logger logger = LoggerFactory.getLogger(DatasetController.class);
-    
-    private static final String DATASETS_DIR = "Y:/morphtesser_exp/Final_Results_Datasets/";
-    private static final String STATIC_INDEX_DIR = "morphtesser_web/backend/cache/swc-index/";
+
+    @Value("${dataset.public.base-dir:/app/data/public-datasets/}")
+    private String datasetsDir;
+
+    @Value("${dataset.index.cache-dir:/app/cache/swc-index/}")
+    private String staticIndexDir;
+
+    @Value("${server.port:80}")
+    private int serverPort;
+
+    @Value("${external.backend.host:cvcd.xyz}")
+    private String externalBackendHost;
+
+    @Value("${external.backend.port:34202}")
+    private int externalBackendPort;
+
+    private File getDatasetsRoot() {
+        return Paths.get(datasetsDir).toFile();
+    }
+
+    private Path datasetPath(String datasetId, String... more) {
+        Path path = Paths.get(datasetsDir, datasetId);
+        for (String segment : more) {
+            path = path.resolve(segment);
+        }
+        return path;
+    }
+
+    private File resolveDatasetPath(String datasetId, String... more) {
+        return datasetPath(datasetId, more).toFile();
+    }
+
+    private File getStaticIndexFile(String datasetId) {
+        return Paths.get(staticIndexDir, datasetId + ".swc-list.json").toFile();
+    }
     // 静态索引方案：不再使用内存列表缓存
 
     @GetMapping("/list")
-    public ResponseEntity<List<Map<String, Object>>> listDatasets() {
+    public ResponseEntity<List<Map<String, Object>>> listDatasets(HttpServletRequest request) {
         try {
-            File datasetsDir = new File(DATASETS_DIR);
-            if (!datasetsDir.exists() || !datasetsDir.isDirectory()) {
-                logger.warn("Datasets directory does not exist: {}", DATASETS_DIR);
+            logRequestEndpoint("[LIST]", request);
+            File datasetsDirFile = getDatasetsRoot();
+            logDirectoryStatus("[LIST][DATASETS_ROOT]", datasetsDirFile);
+            if (!datasetsDirFile.exists() || !datasetsDirFile.isDirectory()) {
+                logger.error("[LIST] 数据集根路径不存在或不可读: {}  (请确认宿主机挂载路径是否正确)", datasetsDir);
                 return ResponseEntity.ok(new ArrayList<>());
             }
 
             List<Map<String, Object>> datasets = new ArrayList<>();
-            File[] datasetDirs = datasetsDir.listFiles(File::isDirectory);
+            File[] datasetDirs = datasetsDirFile.listFiles(File::isDirectory);
+            logger.info("[LIST] 当前数据集根目录 {} 包含 {} 个子目录 (datasetDirs 为 null? {})",
+                    datasetsDirFile.getAbsolutePath(),
+                    datasetDirs == null ? "null" : datasetDirs.length,
+                    datasetDirs == null);
             
             if (datasetDirs != null) {
                 for (File datasetDir : datasetDirs) {
@@ -86,15 +130,45 @@ public class DatasetController {
     public ResponseEntity<Map<String, Object>> getSwcFiles(
             @PathVariable String datasetId,
             @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch,
-            @RequestHeader(value = "If-Modified-Since", required = false) String ifModifiedSince
+            @RequestHeader(value = "If-Modified-Since", required = false) String ifModifiedSince,
+            HttpServletRequest request
     ) {
         try {
-            // 只读静态索引文件，不再动态生成
-            File indexFile = new File(STATIC_INDEX_DIR + datasetId + ".swc-list.json");
-            if (!indexFile.exists()) {
-                logger.warn("Static index file not found for dataset: {}", datasetId);
-                return ResponseEntity.notFound().build();
+            logRequestEndpoint("[SWC]", request);
+            logger.info("[SWC] 接收到数据集请求 datasetId={}", datasetId);
+            File datasetRoot = resolveDatasetPath(datasetId).getParentFile();
+            if (datasetRoot != null) {
+                logger.debug("[SWC] 数据集根目录: {}", datasetRoot.getAbsolutePath());
+                logDirectoryStatus("[SWC][DATASETS_ROOT]", datasetRoot);
             }
+            // 只读静态索引文件，不再动态生成
+            File indexFile = getStaticIndexFile(datasetId);
+            logger.debug("[SWC] 索引文件路径: {}", indexFile.getAbsolutePath());
+            logDirectoryStatus("[SWC][INDEX_PARENT]", indexFile.getParentFile());
+            if (!indexFile.exists()) {
+                logger.warn("[SWC] 索引文件不存在，尝试现场生成 datasetId={}", datasetId);
+                try {
+                    Map<String, Object> built = buildSwcListForDataset(datasetId);
+                    writeJsonToFile(indexFile, built);
+                    logger.info("[SWC] 已生成新的索引文件 datasetId={}, count={}", datasetId, built.get("count"));
+                } catch (Exception genEx) {
+                    File datasetDir = resolveDatasetPath(datasetId);
+                    File resultsDir = resolveDatasetPath(datasetId, "results");
+                    logger.error("[SWC] 索引生成失败 datasetId={}, indexFile={}, datasetDirExists={}, resultsDirExists={}, resultsDirReadable={}, error={}",
+                            datasetId,
+                            indexFile.getAbsolutePath(),
+                            datasetDir.exists(),
+                            resultsDir.exists(),
+                            resultsDir.canRead(),
+                            genEx.getMessage(), genEx);
+                    if (resultsDir.exists()) {
+                        String[] children = resultsDir.list();
+                        logger.error("[SWC] results 子目录列表: {}", children != null ? Arrays.asList(children) : "null");
+                    }
+                    return ResponseEntity.notFound().build();
+                }
+            }
+            logDirectoryStatus("[SWC][INDEX_FILE]", indexFile);
 
             String etag = generateEtagForFile(indexFile, datasetId);
             long lastModified = indexFile.lastModified();
@@ -128,24 +202,40 @@ public class DatasetController {
     @PostConstruct
     public void preloadStaticIndexes() {
         try {
-            File datasetsDir = new File(DATASETS_DIR);
-            if (!datasetsDir.exists() || !datasetsDir.isDirectory()) {
-                logger.warn("Datasets directory not found: {}", DATASETS_DIR);
+            logger.info("[INIT] 服务器监听端口 server.port={}，开始预热数据集索引", serverPort);
+            logExternalPortAvailability();
+            File datasetsDirFile = getDatasetsRoot();
+            logDirectoryStatus("[INIT][DATASETS_ROOT]", datasetsDirFile);
+            if (!datasetsDirFile.exists() || !datasetsDirFile.isDirectory()) {
+                logger.error("[INIT] 数据集根路径不存在或不可读: {}  (请确认宿主机挂载路径是否正确)", datasetsDir);
                 return;
             }
-            
-            File indexDir = new File(STATIC_INDEX_DIR);
+
+            File indexDir = Paths.get(staticIndexDir).toFile();
+            logDirectoryStatus("[INIT][INDEX_ROOT]", indexDir);
             if (!indexDir.exists()) {
                 indexDir.mkdirs();
-                logger.info("Created static index directory: {}", STATIC_INDEX_DIR);
+                logger.info("Created static index directory: {}", staticIndexDir);
+                logDirectoryStatus("[INIT][INDEX_ROOT_CREATED]", indexDir);
             }
-            
-            File[] datasetDirs = datasetsDir.listFiles(File::isDirectory);
+
+            File[] datasetDirs = datasetsDirFile.listFiles(File::isDirectory);
             if (datasetDirs == null) return;
             
             for (File d : datasetDirs) {
                 String id = d.getName();
                 File indexFile = new File(indexDir, id + ".swc-list.json");
+                logger.info("[INIT] 发现数据集目录 id={}, 路径={}, 结果目录={}",
+                        id,
+                        d.getAbsolutePath(),
+                        new File(d, "results").getAbsolutePath());
+                File initResultsDir = new File(d, "results");
+                logDirectoryStatus("[INIT][RESULTS_DIR]", initResultsDir);
+                if (!initResultsDir.exists()) {
+                    logger.error("[INIT] 数据集 {} 缺少 results 目录，期望路径: {} (请检查挂载)", id, initResultsDir.getAbsolutePath());
+                } else if (!initResultsDir.canRead()) {
+                    logger.error("[INIT] 数据集 {} 的 results 目录不可读: {} (检查权限/挂载选项)", id, initResultsDir.getAbsolutePath());
+                }
                 
                 // 如果静态文件不存在，生成它
                 if (!indexFile.exists()) {
@@ -153,11 +243,13 @@ public class DatasetController {
                         Map<String, Object> built = buildSwcListForDataset(id);
                         writeJsonToFile(indexFile, built);
                         logger.info("Generated static index for dataset: {} ({} models)", id, built.get("count"));
+                        logDirectoryStatus("[INIT][INDEX_FILE_GENERATED]", indexFile);
                     } catch (Exception ex) {
                         logger.warn("Failed to generate static index for {}: {}", id, ex.getMessage());
                     }
                 } else {
                     logger.info("Static index already exists for dataset: {}", id);
+                    logDirectoryStatus("[INIT][INDEX_FILE_EXISTS]", indexFile);
                 }
             }
             logger.info("Static SWC index preload finished");
@@ -167,13 +259,39 @@ public class DatasetController {
     }
 
     private Map<String, Object> buildSwcListForDataset(String datasetId) {
-        File resultsDir = new File(DATASETS_DIR + datasetId + "/results");
+        File resultsDir = resolveDatasetPath(datasetId, "results");
         List<Map<String, String>> swcFiles = new ArrayList<>();
+        logger.info("[INDEX] 构建数据集索引 datasetId={}, resultsDir={}, exists={}, readable={}",
+                datasetId,
+                resultsDir.getAbsolutePath(),
+                resultsDir.exists(),
+                resultsDir.canRead());
+        logDirectoryStatus("[INDEX][RESULTS_DIR]", resultsDir);
+        if (!resultsDir.exists()) {
+            logger.error("[INDEX] 数据集 {} 缺少 results 目录，预计路径: {} (请确保宿主机路径 {}/{} 存在并已挂载)",
+                    datasetId,
+                    resultsDir.getAbsolutePath(),
+                    datasetsDir,
+                    datasetId + "/results");
+        }
+        if (!resultsDir.canRead()) {
+            logger.error("[INDEX] 数据集 {} 的 results 目录不可读: {} (检查权限/挂载选项)", datasetId, resultsDir.getAbsolutePath());
+        }
         if (resultsDir.exists() && resultsDir.isDirectory()) {
             File[] modelDirs = resultsDir.listFiles(File::isDirectory);
+            if (modelDirs == null) {
+                logger.warn("[INDEX] results 目录无法列出子目录 datasetId={}, 可能权限不足或发生 I/O 错误", datasetId);
+            } else {
+                logger.debug("[INDEX] results 子目录数量 datasetId={}, count={}", datasetId, modelDirs.length);
+            }
             if (modelDirs != null) {
                 for (File modelDir : modelDirs) {
+                    logger.debug("[INDEX] 扫描模型目录 datasetId={}, modelDir={}", datasetId, modelDir.getName());
                     File[] files = modelDir.listFiles();
+                    if (files == null) {
+                        logger.warn("[INDEX] 模型目录无法列出文件 datasetId={}, modelDir={}, 可能权限不足或发生 I/O 错误", datasetId, modelDir.getName());
+                        continue;
+                    }
                     if (files != null) {
                         for (File file : files) {
                             if (file.getName().toLowerCase().endsWith(".swc")) {
@@ -187,6 +305,8 @@ public class DatasetController {
                     }
                 }
             }
+        } else {
+            logger.warn("[INDEX] 数据集 {} 缺少 results 目录或不可读，索引将为空", datasetId);
         }
         Map<String, Object> response = new HashMap<>();
         response.put("files", swcFiles);
@@ -196,11 +316,23 @@ public class DatasetController {
     }
 
     private void writeJsonToFile(File file, Map<String, Object> data) throws IOException {
-        file.getParentFile().mkdirs();
-        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(data);
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            fos.write(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists()) {
+            boolean created = parent.mkdirs();
+            logger.info("[INDEX_WRITE] 索引目录不存在，尝试创建 path={} created={}", parent.getAbsolutePath(), created);
+            logDirectoryStatus("[INDEX_WRITE][PARENT_AFTER_CREATE]", parent);
+        } else if (parent != null) {
+            logDirectoryStatus("[INDEX_WRITE][PARENT]", parent);
+        } else {
+            logger.warn("[INDEX_WRITE] 索引文件 {} 没有父目录", file.getAbsolutePath());
         }
+        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(data);
+        byte[] payload = json.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try (FileOutputStream fos = new FileOutputStream(file)) {
+            fos.write(payload);
+            logger.info("[INDEX_WRITE] 已写入索引文件 path={} bytes={}", file.getAbsolutePath(), payload.length);
+        }
+        logDirectoryStatus("[INDEX_WRITE][FILE_STATUS]", file);
     }
 
     private String readAll(File file) throws IOException {
@@ -214,11 +346,51 @@ public class DatasetController {
         return "\"" + datasetId + ":" + len + ":" + lm + "\"";
     }
 
+    private void logRequestEndpoint(String tag, HttpServletRequest request) {
+        if (request == null) {
+            logger.warn("{} 请求对象为空，无法记录端口信息", tag);
+            return;
+        }
+        String scheme = request.getScheme();
+        String serverName = request.getServerName();
+        int port = request.getServerPort();
+        String remote = request.getRemoteAddr();
+        String uri = request.getRequestURI();
+        logger.info("{} scheme={} host={} port={} uri={} remote={}", tag, scheme, serverName, port, uri, remote);
+    }
+
+    private void logDirectoryStatus(String tag, File file) {
+        if (file == null) {
+            logger.warn("{} 目录对象为空", tag);
+            return;
+        }
+        boolean exists = file.exists();
+        boolean directory = file.isDirectory();
+        boolean readable = file.canRead();
+        boolean writable = file.canWrite();
+        logger.info("{} path={} exists={} directory={} readable={} writable={}",
+                tag,
+                file.getAbsolutePath(),
+                exists,
+                directory,
+                readable,
+                writable);
+    }
+
+    private void logExternalPortAvailability() {
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(externalBackendHost, externalBackendPort), 2000);
+            logger.info("[PORT_CHECK] 成功连通 {}:{}，端口可访问", externalBackendHost, externalBackendPort);
+        } catch (Exception ex) {
+            logger.warn("[PORT_CHECK] 无法连通 {}:{}，可能未开放或防火墙阻断，错误={}", externalBackendHost, externalBackendPort, ex.getMessage());
+        }
+    }
+
     // 汇总接口：仅返回轻量元信息，便于首屏使用
     @GetMapping("/summaries")
     public ResponseEntity<List<Map<String, Object>>> datasetSummaries() {
         try {
-            File datasetsDirFile = new File(DATASETS_DIR);
+            File datasetsDirFile = getDatasetsRoot();
             if (!datasetsDirFile.exists() || !datasetsDirFile.isDirectory()) {
                 return ResponseEntity.ok(new ArrayList<>());
             }
@@ -254,7 +426,7 @@ public class DatasetController {
     @GetMapping("/{datasetId}/swc/{modelId}/{filename}")
     public ResponseEntity<Resource> getSwcFile(@PathVariable String datasetId, @PathVariable String modelId, @PathVariable String filename) {
         try {
-            File swcFile = new File(DATASETS_DIR + datasetId + "/results/" + modelId + "/" + filename);
+            File swcFile = resolveDatasetPath(datasetId, "results", modelId, filename);
             if (!swcFile.exists() || !swcFile.isFile()) {
                 return ResponseEntity.notFound().build();
             }
@@ -274,7 +446,7 @@ public class DatasetController {
     @GetMapping("/{datasetId}/drc/{modelId}/{filename}")
     public ResponseEntity<Resource> getDrcFile(@PathVariable String datasetId, @PathVariable String modelId, @PathVariable String filename) {
         try {
-            File drcFile = new File(DATASETS_DIR + datasetId + "/results/" + modelId + "/" + filename);
+            File drcFile = resolveDatasetPath(datasetId, "results", modelId, filename);
             if (!drcFile.exists() || !drcFile.isFile()) {
                 return ResponseEntity.notFound().build();
             }
@@ -302,13 +474,13 @@ public class DatasetController {
             
             // 根据测试结果，缩略图文件命名规则：{folderName}_thumbnail.png
             String[] possiblePaths = {
-                DATASETS_DIR + datasetId + "/results/" + folderName + "/" + folderName + "_thumbnail.png",
-                DATASETS_DIR + datasetId + "/results/" + folderName + "/" + modelName + "_thumbnail.png",
-                DATASETS_DIR + datasetId + "/results/" + folderName + "/" + folderName + ".swc_thumbnail.png",
-                DATASETS_DIR + datasetId + "/results/" + folderName + "/" + modelName + ".swc_thumbnail.png",
-                DATASETS_DIR + datasetId + "/results/" + folderName + "/thumbnail.png",
-                DATASETS_DIR + datasetId + "/results/" + folderName + "/" + modelName + ".png",
-                DATASETS_DIR + datasetId + "/thumbnails/" + modelName + ".png"
+                datasetPath(datasetId, "results", folderName, folderName + "_thumbnail.png").toString(),
+                datasetPath(datasetId, "results", folderName, modelName + "_thumbnail.png").toString(),
+                datasetPath(datasetId, "results", folderName, folderName + ".swc_thumbnail.png").toString(),
+                datasetPath(datasetId, "results", folderName, modelName + ".swc_thumbnail.png").toString(),
+                datasetPath(datasetId, "results", folderName, "thumbnail.png").toString(),
+                datasetPath(datasetId, "results", folderName, modelName + ".png").toString(),
+                datasetPath(datasetId, "thumbnails", modelName + ".png").toString()
             };
             
             File thumbnailFile = null;
@@ -342,13 +514,13 @@ public class DatasetController {
     public ResponseEntity<Map<String, Object>> debugThumbnail(@PathVariable String datasetId, @PathVariable String modelName) {
         try {
             String folderName = modelName + ".swc";
-            String thumbnailPath = DATASETS_DIR + datasetId + "/results/" + folderName + "/" + folderName + "_thumbnail.png";
-            File thumbnailFile = new File(thumbnailPath);
+            Path thumbnailPath = datasetPath(datasetId, "results", folderName, folderName + "_thumbnail.png");
+            File thumbnailFile = thumbnailPath.toFile();
             
             Map<String, Object> debugInfo = new HashMap<>();
             debugInfo.put("modelName", modelName);
             debugInfo.put("folderName", folderName);
-            debugInfo.put("thumbnailPath", thumbnailPath);
+            debugInfo.put("thumbnailPath", thumbnailPath.toString());
             debugInfo.put("exists", thumbnailFile.exists());
             debugInfo.put("isFile", thumbnailFile.isFile());
             debugInfo.put("canRead", thumbnailFile.canRead());
@@ -371,7 +543,7 @@ public class DatasetController {
             debugInfo.put("yDriveAbsolutePath", yDrive.getAbsolutePath());
             
             // 检查数据集根目录
-            File datasetRoot = new File(DATASETS_DIR + datasetId);
+            File datasetRoot = resolveDatasetPath(datasetId);
             debugInfo.put("datasetRootExists", datasetRoot.exists());
             debugInfo.put("datasetRootCanRead", datasetRoot.canRead());
             debugInfo.put("datasetRootPath", datasetRoot.getAbsolutePath());
@@ -392,7 +564,7 @@ public class DatasetController {
     @GetMapping("/{datasetId}/models")
     public ResponseEntity<List<Map<String, Object>>> listDatasetModels(@PathVariable String datasetId) {
         try {
-            File resultsDir = new File(DATASETS_DIR + datasetId + "/results");
+            File resultsDir = resolveDatasetPath(datasetId, "results");
             if (!resultsDir.exists() || !resultsDir.isDirectory()) {
                 return ResponseEntity.notFound().build();
             }
@@ -437,7 +609,7 @@ public class DatasetController {
     @GetMapping("/{datasetId}/download")
     public ResponseEntity<Resource> downloadDataset(@PathVariable String datasetId) {
         try {
-            File datasetDir = new File(DATASETS_DIR + datasetId);
+            File datasetDir = resolveDatasetPath(datasetId);
             if (!datasetDir.exists() || !datasetDir.isDirectory()) {
                 return ResponseEntity.notFound().build();
             }
@@ -492,7 +664,7 @@ public class DatasetController {
     @GetMapping("/{datasetId}/models/{modelId}/download")
     public ResponseEntity<Resource> downloadModel(@PathVariable String datasetId, @PathVariable String modelId) {
         try {
-            File modelDir = new File(DATASETS_DIR + datasetId + "/results/" + modelId);
+            File modelDir = resolveDatasetPath(datasetId, "results", modelId);
             if (!modelDir.exists() || !modelDir.isDirectory()) {
                 return ResponseEntity.notFound().build();
             }

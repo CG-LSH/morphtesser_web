@@ -1,0 +1,52 @@
+# 后端多阶段构建（容器内监听 80，直连方案）
+FROM maven:3.9-eclipse-temurin-21 AS builder
+
+WORKDIR /app
+
+RUN mkdir -p /root/.m2 && \
+    echo '<?xml version="1.0" encoding="UTF-8"?>' > /root/.m2/settings.xml && \
+    echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' >> /root/.m2/settings.xml && \
+    echo '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' >> /root/.m2/settings.xml && \
+    echo '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">' >> /root/.m2/settings.xml && \
+    echo '  <mirrors>' >> /root/.m2/settings.xml && \
+    echo '    <mirror>' >> /root/.m2/settings.xml && \
+    echo '      <id>aliyun-maven</id>' >> /root/.m2/settings.xml && \
+    echo '      <mirrorOf>central</mirrorOf>' >> /root/.m2/settings.xml && \
+    echo '      <name>Aliyun Maven</name>' >> /root/.m2/settings.xml && \
+    echo '      <url>https://maven.aliyun.com/repository/public</url>' >> /root/.m2/settings.xml && \
+    echo '    </mirror>' >> /root/.m2/settings.xml && \
+    echo '  </mirrors>' >> /root/.m2/settings.xml && \
+    echo '</settings>' >> /root/.m2/settings.xml
+
+COPY morphtesser_web/backend/pom.xml ./
+
+RUN mvn dependency:go-offline -B || true
+
+COPY morphtesser_web/backend/src ./src
+
+RUN mvn clean package -DskipTests -B
+
+FROM eclipse-temurin:21-jre
+
+WORKDIR /app
+
+COPY --from=builder /app/target/morphtesser-backend-0.0.1-SNAPSHOT.jar app.jar
+
+RUN mkdir -p /app/uploads /app/logs /app/data /app/temp /app/cache/swc-index && \
+    mkdir -p /app/uploads/datasets \
+             /app/data/public-datasets \
+             /app/data/neuromorpho/results \
+             /app/temp/online-modeling \
+             /app/uploads/LSH && \
+    chmod -R 755 /app
+
+RUN groupadd -r spring && \
+    useradd -r -g spring spring && \
+    chown -R spring:spring /app
+
+USER spring:spring
+
+EXPOSE 80
+
+ENTRYPOINT ["sh", "-c", "java -Xmx2G -Xms512M -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE:-${SPRING_PROFILE:-prod}} -jar app.jar"]
+

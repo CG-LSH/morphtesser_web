@@ -13,6 +13,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import ModelViewer from '../components/ModelViewer';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import * as THREE from 'three';
+import { resolveApiUrl } from '../utils/api';
 
 // 轻量嵌入式页面：通过 /embed/mesh/:id 渲染 OBJ Mesh
 // 规则：从本地文件夹 X:\morphtesser_exp\neuromorpho_08\results 下根据ID查找对应的 OBJ 文件
@@ -159,9 +160,9 @@ export default function EmbedMesh() {
             const preferred = searchParams.get('quality') === 'mc' ? 'mc' : 'refined';
 
             // 渲染逻辑：DRC → OBJ → SWC快速建模
-            const dracoProxy = `/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=drc`;
-            const objProxy = `/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=obj`;
-            const swcProxy = `/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=swc`;
+            const dracoProxy = resolveApiUrl(`/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=drc`);
+            const objProxy = resolveApiUrl(`/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=obj`);
+            const swcProxy = resolveApiUrl(`/api/embed/mesh/${encodeURIComponent(id)}?quality=${preferred}&format=swc`);
             
             try {
                 // 步骤1: 尝试DRC文件
@@ -186,7 +187,7 @@ export default function EmbedMesh() {
                 if (swcResponse.ok) {
                     console.log('Found SWC file, performing quick modeling');
                     // 调用快速建模API
-                    const modelingResponse = await fetch(`/api/embed/mesh/${encodeURIComponent(id)}/quick-model`, {
+                    const modelingResponse = await fetch(resolveApiUrl(`/api/embed/mesh/${encodeURIComponent(id)}/quick-model`), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ quality: preferred })
@@ -195,7 +196,7 @@ export default function EmbedMesh() {
                     if (modelingResponse.ok) {
                         const result = await modelingResponse.json();
                         if (result.objUrl && !isCancelled) {
-                            setResolvedUrl(result.objUrl);
+                            setResolvedUrl(resolveApiUrl(result.objUrl));
                             return;
                         }
                     }

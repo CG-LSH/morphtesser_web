@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
+import { resolveApiUrl } from '../utils/api';
 
 const SwcLinePreview = ({ swcUrl, width = '100%', height = 120 }) => {
   const containerRef = useRef(null);
@@ -22,7 +23,7 @@ const SwcLinePreview = ({ swcUrl, width = '100%', height = 120 }) => {
     containerRef.current.appendChild(renderer.domElement);
 
     // 解析SWC并生成线段
-    fetch(swcUrl)
+    fetch(resolveApiUrl(swcUrl))
       .then(res => res.text())
       .then(text => {
         const lines = text.split('\n').filter(l => l.trim() && !l.startsWith('#'));

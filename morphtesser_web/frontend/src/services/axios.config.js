@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// 设置基础URL
-axios.defaults.baseURL = 'http://localhost:8080';
+// 默认指向本地后端，可通过 REACT_APP_API_BASE_URL 覆盖
+axios.defaults.baseURL = process.env.REACT_APP_API_BASE_URL || 'http://cvcd.xyz:34202';
 
 // 允许跨域请求携带凭证
 axios.defaults.withCredentials = true;

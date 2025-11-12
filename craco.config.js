@@ -9,4 +9,9 @@ module.exports = {
       return webpackConfig;
     },
   },
+  devServer: (devServerConfig) => {
+    devServerConfig.allowedHosts = 'all';
+    devServerConfig.host = '0.0.0.0';
+    return devServerConfig;
+  },
 }; 

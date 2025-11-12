@@ -356,7 +356,7 @@ const NeuroMorphoPlugin = () => {
   'use strict';
 
   const BTN_ID = 'morphtesser_button_injected';
-  const EMBED_BASE = 'http://10.3.2.217:3000/embed/mesh/';
+  const EMBED_BASE = 'http://cvcd.xyz:34080/embed/mesh/';
 
   if (document.getElementById(BTN_ID)) return;
 

@@ -26,6 +26,7 @@ import modelService from '../services/model.service';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import ModelCard from '../components/ModelCard';
+import { resolveApiUrl } from '../utils/api';
 // 导入脑图
 import PengBrainImage from '../assets/images/Peng-2021.png';
 import QiuBrainImage from '../assets/images/Qiu-2024.png';
@@ -83,21 +84,25 @@ class ErrorBoundary extends React.Component {
 
 function downloadFile(url, filename) {
   const a = document.createElement('a');
-  a.href = url;
-  a.setAttribute('download', filename || url.split('/').pop());
+  const resolvedUrl = resolveApiUrl(url);
+  a.href = resolvedUrl;
+  const defaultName = resolvedUrl.split('/').pop();
+  a.setAttribute('download', filename || defaultName);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 }
 
 function downloadFileByFetch(url, filename) {
-  fetch(url)
+  const resolvedUrl = resolveApiUrl(url);
+  fetch(resolvedUrl)
     .then(res => res.blob())
     .then(blob => {
       const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = filename || url.split('/').pop();
+      const defaultName = resolvedUrl.split('/').pop();
+      a.download = filename || defaultName;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -242,7 +247,7 @@ const PublicDatabase = () => {
       const preloadPromises = datasets.map(async (dataset) => {
         try {
           // 异步预加载每个数据集的SWC文件列表
-          const response = await fetch(`/api/datasets/${dataset.id}/swc-files`);
+          const response = await fetch(resolveApiUrl(`/api/datasets/${dataset.id}/swc-files`));
           if (response.ok) {
             console.log(`✅ 数据集 ${dataset.name} 缓存预热成功`);
           } else {
@@ -349,7 +354,7 @@ const PublicDatabase = () => {
         headers['If-None-Match'] = cached.etag;
       }
 
-      const response = await fetch(`/api/datasets/${datasetId}/swc-files`, { signal, headers });
+      const response = await fetch(resolveApiUrl(`/api/datasets/${datasetId}/swc-files`), { signal, headers });
       if (response.status === 304 && cached && cached.data) {
         // 服务器确认未变更，直接使用本地缓存
         return cached.data.files || [];
@@ -414,8 +419,8 @@ const PublicDatabase = () => {
           primaryRegion: brainRegions[Math.floor(Math.random() * brainRegions.length)],
           secondaryRegion: `${brainRegions[Math.floor(Math.random() * brainRegions.length)]}_Subregion`,
           cellType: cellTypes[Math.floor(Math.random() * cellTypes.length)],
-          swcUrl: `/api/datasets/${datasetId}/swc/${folderName}/${fileName}`, // 文件夹内的SWC文件
-          drcUrl: `/api/datasets/${datasetId}/drc/${folderName}/data_refined_qp20.drc`, // 优先使用qp20，ModelViewer会自动回退到qp14
+          swcUrl: resolveApiUrl(`/api/datasets/${datasetId}/swc/${folderName}/${fileName}`), // 文件夹内的SWC文件
+          drcUrl: resolveApiUrl(`/api/datasets/${datasetId}/drc/${folderName}/data_refined_qp20.drc`), // 优先使用qp20，ModelViewer会自动回退到qp14
           localPath: `Y:\\morphtesser_exp\\Final_Results_Datasets\\${datasetId}\\results\\${folderName}`
         });
       }
@@ -527,7 +532,12 @@ const PublicDatabase = () => {
     }
   };
 
-  const filteredModels = models.filter(model => {
+  const safeModels = Array.isArray(models) ? models : [];
+  if (!Array.isArray(models)) {
+    console.warn('Expected models to be an array, got:', models);
+  }
+
+  const filteredModels = safeModels.filter(model => {
     // 搜索词过滤
     const matchesSearch = 
       model.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1692,7 +1702,7 @@ const PublicDatabase = () => {
                                 justifyContent: 'center'
                               }}>
                                 <img 
-                                  src={`/api/datasets/${selectedDataset?.id}/thumbnail/${model.name}`}
+                                  src={resolveApiUrl(`/api/datasets/${selectedDataset?.id}/thumbnail/${model.name}`)}
                                   alt={`${model.name} thumbnail`}
                                   style={{
                                     width: '100%',
@@ -1701,7 +1711,7 @@ const PublicDatabase = () => {
                                   }}
                                   onError={(e) => {
                                     console.log('Thumbnail load error for:', model.name);
-                                    console.log('Attempted URL:', `/api/datasets/${selectedDataset?.id}/thumbnail/${model.name}`);
+                                    console.log('Attempted URL:', resolveApiUrl(`/api/datasets/${selectedDataset?.id}/thumbnail/${model.name}`));
                                     // 如果缩略图加载失败，显示默认图标
                                     e.target.style.display = 'none';
                                     e.target.nextSibling.style.display = 'flex';

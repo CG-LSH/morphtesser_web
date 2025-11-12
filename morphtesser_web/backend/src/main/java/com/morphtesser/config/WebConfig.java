@@ -1,12 +1,24 @@
 package com.morphtesser.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
+
+    @Value("${dataset.upload.base-dir:/app/uploads}")
+    private String datasetUploadBaseDir;
+
+    private String toFileLocation(Path path) {
+        String uri = path.toAbsolutePath().normalize().toUri().toString();
+        return uri.endsWith("/") ? uri : uri + "/";
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
@@ -19,15 +31,15 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/*.png")
                .addResourceLocations("classpath:/static/", "classpath:/public/");
 
-         // SWC 文件映射
+        String uploadLocation = toFileLocation(Paths.get(datasetUploadBaseDir));
+
+        // SWC / OBJ / Draco 文件映射（使用可配置路径）
         registry.addResourceHandler("/uploads/swc/**")
-                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/");
-        // OBJ 文件映射
+                .addResourceLocations(uploadLocation);
         registry.addResourceHandler("/uploads/obj/**")
-                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/");
-        // Draco 文件映射
+                .addResourceLocations(uploadLocation);
         registry.addResourceHandler("/uploads/draco/**")
-                .addResourceLocations("file:/Z:/lsh/morphtesser_exp/DataSet/");
+                .addResourceLocations(uploadLocation);
     }
 
     @Override

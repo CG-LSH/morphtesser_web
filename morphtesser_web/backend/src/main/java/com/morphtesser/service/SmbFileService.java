@@ -1,5 +1,6 @@
 package com.morphtesser.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -15,15 +16,19 @@ import java.util.Random;
 @Service
 public class SmbFileService {
 
-    // 本地文件夹路径 - 使用neuromorpho_08结果目录
-    private static final String LOCAL_BASE_PATH = "X:/morphtesser_exp/neuromorpho_08/results";
+    @Value("${dataset.neuromorpho.local-path:/app/data/neuromorpho/results}")
+    private String neuromorphoLocalPath;
+
+    private Path basePath() {
+        return Paths.get(neuromorphoLocalPath).toAbsolutePath().normalize();
+    }
     
     // 文件大小限制：无限制
     // private static final long MAX_FILE_SIZE = 20 * 1024 * 1024; // 已移除大小限制
 
     public byte[] readObj(String id, String quality) throws IOException {
         // 检查基础路径是否存在
-        Path basePath = Paths.get(LOCAL_BASE_PATH);
+        Path basePath = basePath();
         
         if (!Files.exists(basePath)) {
             throw new IOException("基础路径不存在: " + basePath.toAbsolutePath());
@@ -46,7 +51,7 @@ public class SmbFileService {
 
     public byte[] readDraco(String id, String quality) throws IOException {
         // 检查基础路径是否存在
-        Path basePath = Paths.get(LOCAL_BASE_PATH);
+        Path basePath = basePath();
         
         if (!Files.exists(basePath)) {
             throw new IOException("基础路径不存在: " + basePath.toAbsolutePath());

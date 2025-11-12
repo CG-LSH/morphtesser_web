@@ -16,6 +16,7 @@ import org.springframework.web.client.RestTemplate;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.net.URI;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,6 +47,8 @@ public class PythonServiceImpl implements PythonService {
     public Map<String, Object> convertSwcToObj(String swcFilePath) {
         try {
             logger.info("调用Python服务转换SWC到OBJ: {}", swcFilePath);
+            String requestUrl = buildRequestUrl("/convert");
+            logPythonEndpoint("POST /convert", requestUrl);
             
             // 准备请求头
             HttpHeaders headers = new HttpHeaders();
@@ -60,7 +63,7 @@ public class PythonServiceImpl implements PythonService {
             
             // 发送请求
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    pythonServiceUrl + "/convert", requestEntity, String.class);
+                    requestUrl, requestEntity, String.class);
             
             // 解析响应
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
@@ -84,6 +87,8 @@ public class PythonServiceImpl implements PythonService {
     public Map<String, Object> compressObjToDraco(String objFilePath) {
         try {
             logger.info("调用Python服务压缩OBJ到Draco: {}", objFilePath);
+            String requestUrl = buildRequestUrl("/compress/");
+            logPythonEndpoint("POST /compress/", requestUrl);
             
             // 准备请求头
             HttpHeaders headers = new HttpHeaders();
@@ -106,7 +111,7 @@ public class PythonServiceImpl implements PythonService {
             
             // 发送请求
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    pythonServiceUrl + "/compress/", requestEntity, String.class);
+                    requestUrl, requestEntity, String.class);
             
             // 解析响应
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
@@ -241,5 +246,37 @@ public class PythonServiceImpl implements PythonService {
         }
         
         return result;
+    }
+
+    private String buildRequestUrl(String suffix) {
+        if (pythonServiceUrl == null) {
+            logger.warn("[PYTHON_PORT] pythonServiceUrl 未配置，将返回空字符串");
+            return "";
+        }
+        if (pythonServiceUrl.endsWith("/") && suffix.startsWith("/")) {
+            return pythonServiceUrl.substring(0, pythonServiceUrl.length() - 1) + suffix;
+        } else if (!pythonServiceUrl.endsWith("/") && !suffix.startsWith("/")) {
+            return pythonServiceUrl + "/" + suffix;
+        }
+        return pythonServiceUrl + suffix;
+    }
+
+    private void logPythonEndpoint(String action, String url) {
+        try {
+            URI uri = new URI(url);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            int port = uri.getPort();
+            if (port == -1) {
+                if ("https".equalsIgnoreCase(scheme)) {
+                    port = 443;
+                } else if ("http".equalsIgnoreCase(scheme)) {
+                    port = 80;
+                }
+            }
+            logger.info("[PYTHON_PORT] {} -> scheme={} host={} port={} path={}", action, scheme, host, port, uri.getPath());
+        } catch (Exception ex) {
+            logger.warn("[PYTHON_PORT] 解析Python服务URL失败 action={} url={} error={}", action, url, ex.getMessage());
+        }
     }
 } 
