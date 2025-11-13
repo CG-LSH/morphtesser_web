@@ -136,7 +136,7 @@ const PublicDatabase = () => {
   const [publicFiles, setPublicFiles] = useState([]);
   const [datasets] = useState([
     {
-      id: 'peng_radius_03_r10',
+      id: 'peng',
       name: 'Peng Dataset (2021)',
       citation: 'Peng, H. et al. Morphological diversity of single neurons in molecularly defined cell types. Nature 598, 174–181 (2021).',
       description: '',
@@ -157,7 +157,7 @@ const PublicDatabase = () => {
       }
     },
     {
-      id: 'qiu_01_r10',
+      id: 'qiu',
       name: 'Qiu Dataset (2024)',
       citation: 'Qiu, L. et al. Whole-brain spatial organization of hippocampal single-neuron projectomes. Science 383, eadj9198 (2024).',
       description: '',
@@ -178,7 +178,7 @@ const PublicDatabase = () => {
       }
     },
     {
-      id: 'gao_01',
+      id: 'gao',
       name: 'Gao Dataset (2023)',
       citation: 'Gao, L. et al. Single-neuron analysis of dendrites and axons reveals the network organization in mouse prefrontal cortex. Nat. Neurosci. 26, 1111–1126 (2023).',
       description: '',
@@ -199,7 +199,7 @@ const PublicDatabase = () => {
       }
     },
     {
-      id: 'winnubst_01',
+      id: 'winnubst',
       name: 'Winnubst Dataset (2019)',
       citation: 'Winnubst, J. et al. Reconstruction of 1,000 Projection Neurons Reveals New Cell Types and Organization of Long-Range Connectivity in the Mouse Brain. Cell 179, 268–281.e13 (2019).',
       description: '',
@@ -510,10 +510,10 @@ const PublicDatabase = () => {
   const handleDownloadDataset = (datasetId) => {
     // 直接链接到数据集地址
     const datasetUrls = {
-      'peng_radius_03_r10': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\peng_radius_03_r10',
-      'qiu_01_r10': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\qiu_01_r10',
-      'gao_01': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\gao_01',
-      'winnubst_01': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\winnubst_01'
+      'peng': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\peng',
+      'qiu': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\qiu',
+      'gao': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\gao',
+      'winnubst': 'Y:\\morphtesser_exp\\Final_Results_Datasets\\winnubst'
     };
     
     const url = datasetUrls[datasetId];
@@ -824,7 +824,7 @@ const PublicDatabase = () => {
         }}>
           <Box sx={{ width: '100%', height: 240, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             {/* 根据数据集ID显示对应的脑图 */}
-            {dataset.id === 'peng_radius_03_r10' && (
+            {dataset.id === 'peng' && (
               <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                 <Box sx={{ 
                   width: '100%', 
@@ -838,7 +838,7 @@ const PublicDatabase = () => {
                 }} />
               </Box>
             )}
-            {dataset.id === 'qiu_01_r10' && (
+            {dataset.id === 'qiu' && (
               <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                 <Box sx={{ 
                   width: '100%', 
@@ -852,7 +852,7 @@ const PublicDatabase = () => {
                 }} />
               </Box>
             )}
-            {dataset.id === 'gao_01' && (
+            {dataset.id === 'gao' && (
               <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                 <Box sx={{ 
                   width: '100%', 
@@ -866,7 +866,7 @@ const PublicDatabase = () => {
                 }} />
               </Box>
             )}
-            {dataset.id === 'winnubst_01' && (
+            {dataset.id === 'winnubst' && (
               <Box sx={{ width: '100%', height: '100%', position: 'relative' }}>
                 <Box sx={{ 
                   width: '100%', 

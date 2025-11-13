@@ -275,10 +275,10 @@ def main():
     base_path = "Y:\\morphtesser_exp\\Final_Results_Datasets"
     
     datasets = {
-        "peng_radius_03_r10": os.path.join(base_path, "peng_radius_03_r10"),
-        "qiu_01_r10": os.path.join(base_path, "qiu_01_r10"),
-        "gao_01": os.path.join(base_path, "gao_01"),
-        "winnubst_01": os.path.join(base_path, "winnubst_01")
+        "peng": os.path.join(base_path, "peng"),
+        "qiu": os.path.join(base_path, "qiu"),
+        "gao": os.path.join(base_path, "gao"),
+        "winnubst": os.path.join(base_path, "winnubst")
     }
     
     print("Starting SWC thumbnail generation for all datasets...")

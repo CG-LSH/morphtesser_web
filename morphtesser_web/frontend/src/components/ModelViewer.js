@@ -504,14 +504,16 @@ const ModelViewer = React.forwardRef(({ objUrl, dracoUrl, swcUrl, viewMode = "bo
 
     // 加载Draco模型（支持优先级选择）
     const loadDracoModel = (baseUrl) => {
+      if (!baseUrl) return;
       const dracoLoader = new DRACOLoader();
-      // 使用CDN上的Draco解码器
-      dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+      // 使用本地静态资源中的 Draco 解码器
+      dracoLoader.setDecoderPath('/draco/');
       
       // 尝试加载qp20版本，如果失败则加载qp14版本
       const tryLoadDraco = (url, fallbackUrl = null) => {
+        const resolvedUrl = resolveApiUrl(url);
         dracoLoader.load(
-          url,
+          resolvedUrl,
         (geometry) => {
           // DRC 几何体处理：删除原有法向量，重新计算以确保平滑
           if (geometry.attributes.normal) {
@@ -608,7 +610,7 @@ const ModelViewer = React.forwardRef(({ objUrl, dracoUrl, swcUrl, viewMode = "bo
           console.error('Draco加载失败:', error);
           // 如果有备用URL，尝试加载备用版本
           if (fallbackUrl) {
-            console.log('Attempting to load fallback version:', fallbackUrl);
+              console.log('Attempting to load fallback version:', resolveApiUrl(fallbackUrl));
             tryLoadDraco(fallbackUrl);
           } else {
             setError('Failed to load Draco model');
@@ -640,9 +642,10 @@ const ModelViewer = React.forwardRef(({ objUrl, dracoUrl, swcUrl, viewMode = "bo
 
     // 加载OBJ模型
     const loadOBJModel = (url) => {
+      const resolvedUrl = resolveApiUrl(url);
       const loader = new OBJLoader();
       loader.load(
-        url,
+        resolvedUrl,
         (object) => {
           // 设置OBJ材质为半透明、颜色随机
           const randomColor = () => {

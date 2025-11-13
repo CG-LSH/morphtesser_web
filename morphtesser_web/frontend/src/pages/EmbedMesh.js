@@ -16,9 +16,9 @@ import * as THREE from 'three';
 import { resolveApiUrl } from '../utils/api';
 
 // 轻量嵌入式页面：通过 /embed/mesh/:id 渲染 OBJ Mesh
-// 规则：从本地文件夹 X:\morphtesser_exp\neuromorpho_08\results 下根据ID查找对应的 OBJ 文件
+// 规则：从本地文件夹 X:\morphtesser_exp\neuromorpho\results 下根据ID查找对应的 OBJ 文件
 // 支持通过 ?quality=mc 强制使用 data_mc.obj，否则使用 data_refined.obj
-// 查找路径：X:\morphtesser_exp\neuromorpho_08\results\{前三位}\{id}.swc\data_{quality}.obj
+// 查找路径：X:\morphtesser_exp\neuromorpho\results\{前三位}\{id}.swc\data_{quality}.obj
 
 export default function EmbedMesh() {
     const { id } = useParams();

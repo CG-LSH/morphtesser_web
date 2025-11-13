@@ -3,11 +3,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY morphtesser_web/frontend/package*.json ./
+COPY frontend/package*.json ./
 
 RUN npm install
 
-COPY morphtesser_web/frontend/ ./
+COPY frontend/ ./
 
 RUN npm run build
 

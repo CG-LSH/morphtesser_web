@@ -10,16 +10,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClientException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.client.RestTemplate;
 
 import com.morphtesser.service.SmbFileService;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @RestController
 @RequestMapping("/api/embed")
 public class EmbedController {
 
-    private static final String DEFAULT_BASE = "http://10.6.51.163:5000/shared/morphtesser_exp/neuromorpho_08";
+    @Value("${dataset.neuromorpho.remote-base:http://localhost:5000/shared/morphtesser_exp/neuromorpho}")
+    private String defaultRemoteBase;
 
     @Autowired
     private SmbFileService smbFileService;
@@ -84,7 +86,7 @@ public class EmbedController {
             @RequestParam(value = "format", required = false, defaultValue = "obj") String format,
             @RequestParam(value = "base", required = false) String base
     ) {
-        String b = (base == null || base.isBlank()) ? DEFAULT_BASE : base;
+        String b = (base == null || base.isBlank()) ? defaultRemoteBase : base;
 
         byte[] data = null;
         String usedUrl = null;

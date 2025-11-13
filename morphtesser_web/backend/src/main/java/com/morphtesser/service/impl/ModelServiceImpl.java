@@ -1,7 +1,5 @@
 package com.morphtesser.service.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.morphtesser.model.NeuronModel;
 import com.morphtesser.model.User;
 import com.morphtesser.repository.ModelRepository;
@@ -9,12 +7,10 @@ import com.morphtesser.repository.UserRepository;
 import com.morphtesser.security.JwtUtils;
 import com.morphtesser.service.ModelService;
 import com.morphtesser.service.PythonService;
-import com.morphtesser.service.ModelPreviewService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.UrlResource;
@@ -30,12 +26,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -90,12 +83,16 @@ public class ModelServiceImpl implements ModelService {
     @Autowired
     private PythonService pythonService;
     
-    @Autowired
-    private ModelPreviewService modelPreviewService;
-    
     // Python建模API URL（支持内网穿透地址）
     @Value("${python.modeling.api.url:http://localhost:8000/swc2obj/}")
     private String pythonModelingApiUrl;
+
+    // Draco压缩脚本配置
+    @Value("${draco.compressor.python:python3}")
+    private String dracoCompressorPython;
+
+    @Value("${draco.compressor.script:/app/tools/draco_compressor.py}")
+    private String dracoCompressorScript;
     
     // 在线建模临时文件目录（不保存到数据库）
     @Value("${dataset.online-modeling.temp-dir:./temp/online-modeling/}")
@@ -124,13 +121,17 @@ public class ModelServiceImpl implements ModelService {
             Files.createDirectories(targetDir);
 
             // 4. 保存文件
-            String fileName = file.getOriginalFilename();
+            String originalFileName = file.getOriginalFilename();
+            String fileName = (originalFileName == null || originalFileName.isBlank())
+                    ? "model-" + UUID.randomUUID() + ".swc"
+                    : originalFileName;
             Path swcPath = targetDir.resolve(fileName);
             file.transferTo(swcPath.toFile());
             model.setFilePath(toRelative(swcPath));
 
             // 5. 如果是SWC，调用Python服务
-            String extension = fileName.substring(fileName.lastIndexOf("."));
+            int dotIndex = fileName.lastIndexOf('.');
+            String extension = dotIndex >= 0 ? fileName.substring(dotIndex) : "";
             if (extension.equalsIgnoreCase(".swc")) {
                 Map<String, Object> result = pythonService.convertSwcToObj(swcPath.toString());
                 // Python返回obj的绝对路径，转为相对路径
@@ -289,9 +290,12 @@ public class ModelServiceImpl implements ModelService {
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", new FileSystemResource(swcFilePath));
             // 关键：根据 type 传递 result_type
-            String resultType = "refined";
-            if (!"refine".equals(type)) {
-                resultType = "raw";
+            String resultType;
+            if ("refine".equalsIgnoreCase(type)) {
+                resultType = "refined";
+            } else {
+                // raw / fast / 默认都走 obj
+                resultType = "obj";
             }
             body.add("result_type", resultType);
             HttpHeaders headers = new HttpHeaders();
@@ -303,9 +307,8 @@ public class ModelServiceImpl implements ModelService {
             String objFilePath = Paths.get(sessionDir, objFileName).toString();
 
             // 判定是否真正得到了 OBJ：避免将 JSON 错误写入 OBJ 导致 0 字节或极小文件
-            String contentType = response.getHeaders().getContentType() != null
-                    ? response.getHeaders().getContentType().toString()
-                    : "";
+            MediaType responseContentType = response.getHeaders().getContentType();
+            String contentType = responseContentType != null ? responseContentType.toString() : "";
             byte[] bodyBytes = response.getBody();
             boolean isJson = contentType.contains("application/json");
             boolean looksTooSmall = bodyBytes == null || bodyBytes.length < 200; // 小文件大概率不是有效OBJ
@@ -320,11 +323,12 @@ public class ModelServiceImpl implements ModelService {
             if (!wroteObj && "refine".equals(type)) {
                 MultiValueMap<String, Object> body2 = new LinkedMultiValueMap<>();
                 body2.add("file", new FileSystemResource(swcFilePath));
-                body2.add("result_type", "raw");
+                body2.add("result_type", "obj");
                 HttpEntity<MultiValueMap<String, Object>> req2 = new HttpEntity<>(body2, headers);
                 ResponseEntity<byte[]> resp2 = restTemplate.exchange(url, HttpMethod.POST, req2, byte[].class);
 
-                String ct2 = resp2.getHeaders().getContentType() != null ? resp2.getHeaders().getContentType().toString() : "";
+                MediaType resp2ContentType = resp2.getHeaders().getContentType();
+                String ct2 = resp2ContentType != null ? resp2ContentType.toString() : "";
                 byte[] b2 = resp2.getBody();
                 boolean json2 = ct2.contains("application/json");
                 boolean small2 = b2 == null || b2.length < 200;
@@ -341,43 +345,11 @@ public class ModelServiceImpl implements ModelService {
                 throw new RuntimeException("Out of memory: OBJ file was not generated. Modeling failed.");
             }
             
-            // 启用Draco压缩
+            // 启用Draco压缩（使用 draco_encoder 二进制）
             String dracoFileName = objFileName.replace(".obj", ".drc");
             String dracoFilePath = Paths.get(sessionDir, dracoFileName).toString();
             
-            try {
-                // 直接调用Python脚本进行Draco压缩（使用qp14）
-                String[] cmd = {
-                    "C:\\Users\\15370\\anaconda3\\python.exe", 
-                    "draco_compressor.py",
-                    objFilePath,
-                    dracoFilePath,
-                    "7",  // compression_level
-                    "14"  // quantization_bits (qp14)
-                };
-                
-                ProcessBuilder pb = new ProcessBuilder(cmd);
-                pb.directory(new File(System.getProperty("user.dir")));
-                Process process = pb.start();
-                
-                // 读取输出
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                String line;
-                StringBuilder output = new StringBuilder();
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-                
-                int exitCode = process.waitFor();
-                
-                if (exitCode != 0 || !new File(dracoFilePath).exists()) {
-                    logger.warn("Draco压缩失败，继续使用OBJ文件: {}", output.toString());
-                } else {
-                    logger.info("Draco压缩成功: {}", dracoFilePath);
-                }
-            } catch (Exception e) {
-                logger.warn("Draco压缩异常: {}", e.getMessage());
-            }
+            runDracoCompressor(objFilePath, dracoFilePath, 7, 14);
             
             // 在线建模不保存到数据库，使用临时路径和会话ID
             String swcHttpPath = "/api/temp/online-modeling/" + sessionId + "/" + swcFileName;
@@ -428,6 +400,61 @@ public class ModelServiceImpl implements ModelService {
     /**
      * 递归删除目录（辅助方法）
      */
+    private boolean runDracoCompressor(String objFilePath, String dracoFilePath, int compressionLevel, int quantizationBits) {
+        try {
+            File scriptFile = new File(dracoCompressorScript);
+            if (!scriptFile.exists()) {
+                logger.warn("draco_compressor.py 未找到: {} (可通过 DRACO_COMPRESSOR_SCRIPT 配置)", dracoCompressorScript);
+                return false;
+            }
+
+            String[] cmd = new String[] {
+                dracoCompressorPython,
+                dracoCompressorScript,
+                objFilePath,
+                dracoFilePath,
+                String.valueOf(compressionLevel),
+                String.valueOf(quantizationBits)
+            };
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            }
+
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                logger.warn("DracoPy压缩失败 (exitCode={}): {}", exitCode, output.toString());
+                return false;
+            }
+
+            File dracoFile = new File(dracoFilePath);
+            if (!dracoFile.exists() || dracoFile.length() == 0) {
+                logger.warn("DracoPy未生成有效 DRC 文件: {}", dracoFilePath);
+                return false;
+            }
+
+            logger.info("DracoPy压缩成功: {} (输出大小={} bytes)", dracoFilePath, dracoFile.length());
+            if (output.length() > 0) {
+                logger.debug("DracoPy 输出: {}", output.toString().trim());
+            }
+            return true;
+        } catch (Exception e) {
+            logger.warn("执行 DracoPy 压缩失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 递归删除目录（辅助方法）
+     */
     private void deleteDirectory(File directory) {
         if (directory.exists() && directory.isDirectory()) {
             File[] files = directory.listFiles();
@@ -471,7 +498,18 @@ public class ModelServiceImpl implements ModelService {
     public Map<String, Object> compressModelToDraco(String objFilePath, int compressionLevel, int quantizationBits) {
         try {
             logger.info("压缩模型为Draco格式: {}, level={}, bits={}", objFilePath, compressionLevel, quantizationBits);
-            return pythonService.compressObjToDraco(objFilePath);
+            String dracoFilePath = objFilePath.replaceAll("\\.obj$", ".drc");
+            boolean success = runDracoCompressor(objFilePath, dracoFilePath, compressionLevel, quantizationBits);
+            if (!success) {
+                return null;
+            }
+            Map<String, Object> result = new HashMap<>();
+            result.put("dracoPath", dracoFilePath);
+            File dracoFile = new File(dracoFilePath);
+            if (dracoFile.exists()) {
+                result.put("size", dracoFile.length());
+            }
+            return result;
         } catch (Exception e) {
             logger.error("压缩模型失败", e);
             return null;

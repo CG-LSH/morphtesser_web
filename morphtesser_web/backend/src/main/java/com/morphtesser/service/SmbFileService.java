@@ -74,7 +74,7 @@ public class SmbFileService {
 
     /**
      * 根据ID查找对应的OBJ文件
-     * 查找路径格式：X:/morphtesser_exp/neuromorpho_08/results/{前三位}/{id}.swc/data_{quality}.obj
+     * 查找路径格式：X:/morphtesser_exp/neuromorpho/results/{前三位}/{id}.swc/data_{quality}.obj
      * 注意：查找目录时需要补0，但查找具体文件时使用原始ID
      */
     private Path findObjById(Path basePath, String id, String quality) throws IOException {
@@ -119,7 +119,7 @@ public class SmbFileService {
 
     /**
      * 根据ID查找对应的DRC文件
-     * 查找路径格式：X:/morphtesser_exp/neuromorpho_08/results/{前三位}/{id}.swc/data_{quality}.drc
+     * 查找路径格式：X:/morphtesser_exp/neuromorpho/results/{前三位}/{id}.swc/data_{quality}.drc
      * 注意：查找目录时需要补0，但查找具体文件时使用原始ID
      */
     private Path findDracoById(Path basePath, String id, String quality) throws IOException {

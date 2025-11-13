@@ -34,12 +34,17 @@ WORKDIR /app
 
 COPY --from=builder /app/target/morphtesser-backend-0.0.1-SNAPSHOT.jar app.jar
 
-RUN mkdir -p /app/uploads /app/logs /app/data /app/temp /app/cache/swc-index && \
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip && rm -rf /var/lib/apt/lists/*
+RUN python3 -m pip install --no-cache-dir --break-system-packages numpy trimesh DracoPy
+COPY draco_compressor.py /app/tools/draco_compressor.py
+
+RUN mkdir -p /app/uploads /app/logs /app/data /app/temp /app/cache/swc-index /app/tools && \
     mkdir -p /app/uploads/datasets \
              /app/data/public-datasets \
              /app/data/neuromorpho/results \
              /app/temp/online-modeling \
              /app/uploads/LSH && \
+    chmod +x /app/tools/draco_compressor.py && \
     chmod -R 755 /app
 
 RUN groupadd -r spring && \

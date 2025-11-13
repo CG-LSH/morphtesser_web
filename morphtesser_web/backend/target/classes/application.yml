@@ -4,7 +4,7 @@ smb:
   username: lsh@cvcd.xyz
   password: "6^6zxmC$AUa5"
   share: shared
-  root: morphtesser_exp/neuromorpho_08
+  root: morphtesser_exp/neuromorpho
 python:
   service:
     url: http://localhost:8001
